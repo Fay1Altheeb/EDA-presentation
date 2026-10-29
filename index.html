@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<meta content="#090d19" name="theme-color"/>
+<meta content="Beyond the Scroll — an interactive data story about short-video breaks, prospective memory, and exploratory data analysis." name="description"/>
+<title>Beyond the Scroll</title>
+<style>
+:root{--bg:#090d19;--panel:#12182a;--edge:#29324c;--ink:#f7f4ff;--sub:#b5bfd9;--muted:#8793b1;--violet:#b5a0ff;--violet2:#775fdd;--mint:#70e5d3;--gold:#ffcd94;--blue:#8eb6ff;--rose:#ff9fbd;--r:22px;--ease:cubic-bezier(.2,.8,.2,1);--spring:cubic-bezier(.34,1.56,.64,1)}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{margin:0;font-family:Inter,"Segoe UI",system-ui,-apple-system,sans-serif;color:var(--ink);overflow-x:hidden}
+button,a{font:inherit}a{color:inherit}button{cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid var(--mint);outline-offset:4px}
+.ambient{position:fixed;inset:0;z-index:-2;pointer-events:none;background:radial-gradient(ellipse at 85% 5%,#4d37743e 0,transparent 36%),radial-gradient(ellipse at 8% 78%,#1b4e5840 0,transparent 40%),#090d19}
+.ambient:after{content:"";position:absolute;inset:0;background-image:linear-gradient(#ffffff06 1px,transparent 1px),linear-gradient(90deg,#ffffff06 1px,transparent 1px);background-size:54px 54px;mask-image:linear-gradient(110deg,#0007,transparent 65%)}
+.blob{position:fixed;z-index:-1;border-radius:50%;filter:blur(70px);opacity:.33;pointer-events:none;animation:drift 22s ease-in-out infinite alternate}
+.blob.a{width:420px;height:420px;background:#6d4fd6;top:-120px;right:8%}
+.blob.b{width:360px;height:360px;background:#1f8f80;bottom:-120px;left:-60px;animation-duration:28s}
+@keyframes drift{to{transform:translate(-90px,70px) scale(1.15)}}
+#fx{position:fixed;inset:0;pointer-events:none;z-index:80}
+
+/* Top bar */
+.topbar{height:72px;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 clamp(16px,4vw,64px);border-bottom:1px solid #ffffff13;position:relative;z-index:10;background:#0b0e19c7;backdrop-filter:blur(17px)}
+.brand{display:flex;align-items:center;gap:11px;font-size:14px;font-weight:850;letter-spacing:-.04em;white-space:nowrap}
+.brand-mark{display:grid;place-items:center;width:32px;height:32px;background:linear-gradient(145deg,var(--violet),var(--mint));border-radius:11px;color:#151427;font-weight:900;font-size:19px;animation:wobble 6s ease-in-out infinite}
+@keyframes wobble{0%,90%,100%{transform:rotate(0)}93%{transform:rotate(-12deg)}96%{transform:rotate(9deg)}}
+.brand .mute{font-weight:450;color:var(--muted)}
+.qtrack{display:flex;align-items:center;gap:6px}
+.qtrack .lbl{font-size:10px;letter-spacing:.14em;color:var(--muted);font-weight:800;margin-right:4px;text-transform:uppercase}
+.qchip{width:34px;height:28px;border-radius:9px;border:1px solid #ffffff22;background:#ffffff07;color:#8f99b6;font-size:11px;font-weight:850;display:grid;place-items:center;transition:.35s var(--ease);position:relative}
+.qchip.done{border-color:#70e5d388;color:var(--mint);background:#70e5d314}
+.qchip.done:after{content:"✓";position:absolute;top:-7px;right:-6px;font-size:9px;background:var(--mint);color:#0b1a1a;border-radius:50%;width:14px;height:14px;display:grid;place-items:center}
+.qchip.on{border-color:var(--violet);color:#1a1530;background:var(--violet);transform:translateY(-2px);box-shadow:0 0 22px #b5a0ff66;animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 4px #b5a0ff22}}
+.tools{display:flex;align-items:center;gap:7px}
+.icon-btn{border:1px solid #ffffff22;background:#ffffff09;color:#e8e6fa;height:38px;min-width:38px;border-radius:12px;display:grid;place-items:center;transition:.18s ease;font-size:16px;padding:0 10px}
+.icon-btn:hover{background:#ffffff18;border-color:#a897ef88;transform:translateY(-1px)}
+.icon-btn[disabled]{opacity:.3;cursor:not-allowed;transform:none}
+
+/* Deck + slide transitions */
+.deck{width:min(100%,1536px);margin:0 auto}
+.slide{display:none;min-height:calc(100svh - 144px);padding:clamp(24px,4vh,60px) clamp(22px,5.6vw,90px) 28px;position:relative;overflow:hidden}
+.slide.active{display:flex;flex-direction:column;justify-content:center;animation:inFwd .55s var(--ease) both}
+.deck.back .slide.active{animation-name:inBack}
+@keyframes inFwd{from{opacity:0;transform:translateX(46px) scale(.985)}}
+@keyframes inBack{from{opacity:0;transform:translateX(-46px) scale(.985)}}
+.slide .inner{width:100%;position:relative;z-index:2}
+.rv{opacity:0}
+.slide.active .rv{animation:rise .7s var(--ease) both;animation-delay:calc(var(--i,0) * 95ms + 140ms)}
+@keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+.slide.active .pop{animation:popIn .6s var(--spring) both;animation-delay:calc(var(--i,0) * 95ms + 140ms)}
+@keyframes popIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+
+/* Type */
+.eyebrow{display:flex;align-items:center;gap:12px;margin:0 0 18px;color:var(--mint);text-transform:uppercase;letter-spacing:.19em;font-size:11px;font-weight:850}
+.eyebrow:before{content:"";width:26px;height:1px;background:var(--mint)}
+h1,h2,h3,p{margin-top:0}
+h1,h2{letter-spacing:-.06em;line-height:1.04}
+h2{font-size:clamp(36px,4.6vw,66px);font-weight:800;margin-bottom:14px;max-width:1150px}
+h3{font-size:clamp(19px,1.7vw,25px);line-height:1.2;letter-spacing:-.035em;margin-bottom:10px}
+.hl{color:var(--violet)}.hl-mint{color:var(--mint)}.hl-gold{color:var(--gold)}.hl-rose{color:var(--rose)}
+.lede{color:#bec8e3;font-size:clamp(17px,1.5vw,21px);line-height:1.6;max-width:800px}
+.small{font-size:13px;line-height:1.6;color:#a9b4ce}
+.subhead{font-size:clamp(15px,1.25vw,18px);line-height:1.5;color:var(--sub);max-width:980px;margin-bottom:18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.card{background:linear-gradient(145deg,#1b2136e8,#121829e8);border:1px solid #39405b90;border-radius:var(--r);padding:clamp(17px,2vw,26px);min-width:0}
+.card.soft{background:#131a2b9c;border-color:#293550}
+.card.accent{border-color:#ad98f888;background:linear-gradient(140deg,#272044,#141c33)}
+.card p{font-size:clamp(14px,1.15vw,16px);line-height:1.6;color:var(--sub);margin-bottom:0}
+.topline{display:block;color:var(--mint);font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:850;margin-bottom:12px}
+.callout{border-left:3px solid var(--mint);background:#16283a80;padding:12px 16px;border-radius:3px 12px 12px 3px;color:#d6e4f2;font-size:15px;line-height:1.55;margin-top:14px}
+.callout strong{color:var(--mint)}
+.qbadge{display:inline-flex;gap:6px;margin-left:6px}
+.qbadge span{background:var(--violet);color:#1a1530;border-radius:7px;padding:3px 8px;font-size:10px;letter-spacing:.06em;font-weight:900}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;border:1px solid #ffffff2c;border-radius:12px;background:#ffffff10;color:#ece8fb;padding:10px 16px;font-weight:800;font-size:13px;transition:.2s var(--ease)}
+.btn{text-decoration:none}
+.btn:hover{background:#ffffff1c;transform:translateY(-2px)}
+.btn.primary{background:var(--violet);color:#1b1434;border-color:var(--violet)}
+.btn.primary:hover{background:#cabaff}
+.btn.sel{background:var(--violet);color:#1b1434;border-color:var(--violet)}
+.seg{display:inline-flex;gap:6px;flex-wrap:wrap}
+.seg .btn{padding:7px 13px;font-size:12px;border-radius:10px}
+
+/* Footer */
+.footer{height:72px;padding:0 clamp(16px,4vw,64px);display:flex;align-items:center;justify-content:space-between;gap:18px;border-top:1px solid #ffffff15;background:#0b0e19e0;position:relative;z-index:11}
+.page-counter{color:#a9b2cd;font-variant-numeric:tabular-nums;font-weight:700;font-size:13px;white-space:nowrap;min-width:68px}
+.footer-hint{font-size:12px;color:var(--muted)}
+.progress-track{position:fixed;height:3px;bottom:72px;left:0;right:0;background:#ffffff0a;z-index:12}
+.progress-fill{width:0;height:100%;background:linear-gradient(90deg,var(--violet),var(--mint));transition:width .45s var(--ease);position:relative}
+.progress-fill:after{content:"";position:absolute;right:-5px;top:-4px;width:11px;height:11px;border-radius:50%;background:var(--mint);box-shadow:0 0 14px var(--mint)}
+.nav-btn{min-width:92px;font-size:13px;font-weight:800;gap:10px;padding:12px 15px;display:inline-flex}
+.nav-btn.primary{background:var(--violet);color:#191629;border-color:var(--violet)}
+.nav-btn.primary:hover{background:#cabaff}
+
+/* 01 Cover */
+.cover-grid{display:grid;grid-template-columns:1.2fr .8fr;align-items:center;gap:20px;min-height:58vh}
+.hero-title{font-size:clamp(62px,7.6vw,120px);line-height:.93;font-weight:850;letter-spacing:-.065em;margin-bottom:24px}
+.hero-title .ln{display:block;overflow:hidden}
+.hero-title .ln>span{display:inline-block}
+.slide.active .hero-title .ln>span{animation:lineUp .9s var(--ease) both}
+.slide.active .hero-title .ln:nth-child(2)>span{animation-delay:.12s}
+.slide.active .hero-title .ln:nth-child(3)>span{animation-delay:.24s}
+@keyframes lineUp{from{transform:translateY(105%)}}
+.scrollword{background:linear-gradient(90deg,var(--violet),var(--mint),var(--violet));background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 5s linear infinite}
+@keyframes shine{to{background-position:-200% 0}}
+.orbit{height:min(38vw,480px);aspect-ratio:1;position:relative;margin:auto;max-width:100%}
+.orbit .ring{position:absolute;inset:6%;border-radius:50%;border:1px dashed #aa9bee55;animation:spin 40s linear infinite}
+.orbit .ring.two{inset:16%;border-style:solid;border-color:#70e5d340;animation-duration:26s;animation-direction:reverse}
+@keyframes spin{to{transform:rotate(360deg)}}
+.phone{position:absolute;inset:20% 31%;border:7px solid #222337;border-radius:32px;background:linear-gradient(160deg,#a790f0,#674b9b 55%,#202946);box-shadow:0 28px 65px #0008,0 0 0 1px #ffffff36;transform:rotate(9deg);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;overflow:hidden;animation:float 5s ease-in-out infinite}
+@keyframes float{50%{transform:rotate(6deg) translateY(-12px)}}
+.phone small{font-size:11px;font-weight:900;letter-spacing:.2em;color:#e8e5ff}
+.phone strong{font-size:clamp(24px,3.4vw,46px);line-height:1;color:#fff;letter-spacing:.04em;transition:.3s}
+.phone strong.cue{color:var(--mint);text-shadow:0 0 22px var(--mint)}
+.phone .feed{position:absolute;left:12%;right:12%;bottom:-40%;height:80%;display:flex;flex-direction:column;gap:8px;animation:feed 3.2s linear infinite;opacity:.35}
+.phone .feed i{display:block;height:34px;border-radius:9px;background:#ffffff40}
+@keyframes feed{to{transform:translateY(-50%)}}
+.chip{position:absolute;border-radius:100px;padding:10px 15px;border:1px solid #ffffff30;background:#181c33df;box-shadow:0 10px 25px #0005;font-weight:780;font-size:12px;white-space:nowrap;animation:float2 6s ease-in-out infinite}
+.chip.c1{left:-4%;top:24%}.chip.c2{right:-3%;bottom:16%;animation-delay:-2s}.chip.c3{right:8%;top:5%;animation-delay:-4s}
+@keyframes float2{50%{transform:translateY(-10px) rotate(-3deg)}}
+.start-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:28px}
+.kbd{display:inline-grid;place-items:center;min-width:26px;height:24px;border:1px solid #ffffff35;border-bottom-width:3px;border-radius:7px;font-size:11px;font-weight:800;color:#d8d2ee;padding:0 6px}
+
+/* 02 Poll */
+.poll{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(12px,1.6vw,20px)}
+.opt{position:relative;min-height:220px;padding:clamp(16px,2vw,26px);border:1px solid #b5a0ff35;border-radius:23px;background:linear-gradient(145deg,#24213d9e,#121a2cdb 72%);display:flex;flex-direction:column;justify-content:flex-end;text-align:left;color:inherit;overflow:hidden;transition:transform .25s var(--spring),border-color .2s}
+.opt:hover{transform:translateY(-6px) rotate(-.6deg);border-color:#b5a0ff99}
+.opt:active{transform:scale(.97)}
+.opt .ico{height:56px;width:56px;border-radius:18px;display:grid;place-items:center;margin-bottom:auto;background:#b5a0ff18;color:var(--violet);transition:.3s var(--spring)}
+.opt:hover .ico{transform:rotate(-8deg) scale(1.1)}
+.opt .ico svg{width:34px;height:34px}
+.opt h3{margin:16px 0 4px}
+.opt p{font-size:14px;color:#aeb9d6;margin:0}
+.opt .fill{position:absolute;left:0;bottom:0;height:5px;width:0;background:linear-gradient(90deg,var(--violet),var(--mint));transition:width .6s var(--ease)}
+.opt .count{position:absolute;top:18px;right:18px;font-size:26px;font-weight:850;letter-spacing:-.04em;color:#fff;opacity:0;transition:.3s}
+.opt.voted .count{opacity:1}
+.opt.top{border-color:var(--mint);box-shadow:0 0 0 1px var(--mint),0 18px 40px #70e5d322}
+.floaty{position:fixed;pointer-events:none;z-index:90;font-size:26px;font-weight:900;animation:floatUp 1s var(--ease) forwards}
+@keyframes floatUp{to{transform:translateY(-70px) scale(1.4);opacity:0}}
+.poll-q{margin-top:clamp(20px,4vh,44px);padding-top:18px;display:flex;gap:16px;align-items:center;border-top:1px solid #ffffff23;justify-content:space-between;flex-wrap:wrap}
+.poll-q p{font-size:clamp(21px,2.5vw,34px);font-weight:780;letter-spacing:-.04em;line-height:1.2;margin:0}
+
+/* 03 Study */
+.timeline{display:grid;grid-template-columns:1fr 54px 1.4fr 54px 1fr;gap:10px;align-items:stretch;margin-top:24px}
+.tl{border-radius:21px;padding:24px;background:#171f32;border:1px solid #37435d}
+.tl.focus{border-color:#ab9bf66e;background:linear-gradient(145deg,#2c234c,#171f32)}
+.step-no{color:var(--mint);font-size:11px;font-weight:850;letter-spacing:.14em;margin-bottom:16px}
+.tl p{color:var(--sub);line-height:1.5;font-size:15px;margin:0}
+.tl-arrow{display:grid;place-items:center}
+.tl-arrow .arr{width:46px;height:46px;border-radius:50%;border:1px solid #b5a0ff66;background:#b5a0ff1a;display:grid;place-items:center;color:var(--violet);box-shadow:0 0 24px #b5a0ff22}
+.tl-arrow svg{width:22px;height:22px;stroke:currentColor;stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round;animation:nudge 1.6s ease-in-out infinite}
+@keyframes nudge{50%{transform:translateX(4px)}}
+@keyframes nudgeY{50%{transform:rotate(90deg) translateX(4px)}}
+.tl{transition:transform .3s var(--spring),border-color .3s}
+.tl:hover{transform:translateY(-4px);border-color:#b5a0ff88}
+.conds{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:16px}
+@media(min-width:1380px){.conds{grid-template-columns:repeat(4,1fr)}}
+.cond{border-radius:13px;padding:14px 8px;text-align:center;border:1px solid #ffffff24;background:#ffffff09;transition:.25s var(--spring)}
+.cond:hover{transform:translateY(-5px) scale(1.04);border-color:var(--c)}
+.cond strong{font-size:14px;color:var(--c)}.cond span{display:block;margin-top:4px;font-size:11px;color:#b4bdd8}
+.cond i{display:block;font-style:normal;font-size:22px;margin-bottom:8px}
+
+/* 04 Tasks + game */
+.task-grid{display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:16px;align-items:stretch}
+.sample{border:1px solid #ffffff24;background:linear-gradient(135deg,#262b4c,#191d33);border-radius:16px;margin:14px 0;padding:16px;font-weight:800;text-align:center;letter-spacing:.1em;font-size:clamp(24px,3vw,38px)}
+.game{background:linear-gradient(150deg,#1d2546,#141a2e);border:1px solid #8f80cb;border-radius:var(--r);padding:20px;display:flex;flex-direction:column;min-width:0;position:relative;overflow:hidden}
+.game .rule{font-size:13px;color:#d9d4f2;line-height:1.5;margin:0 0 10px}
+.game .rule b{color:var(--gold)}
+.stage{flex:1;min-height:120px;display:grid;place-items:center;border-radius:14px;background:#0d1222;border:1px solid #ffffff15;position:relative;overflow:hidden}
+.stage .word{font-size:clamp(28px,3.2vw,44px);font-weight:850;letter-spacing:.12em}
+.stage .word.show{animation:wordIn .3s var(--spring)}
+@keyframes wordIn{from{transform:scale(.5);opacity:0}}
+.stage .timer{position:absolute;left:0;bottom:0;height:4px;background:var(--violet);width:100%}
+.stage.good{box-shadow:inset 0 0 0 2px var(--mint)}
+.stage.bad{box-shadow:inset 0 0 0 2px var(--rose);animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.game-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+.game-actions .btn{padding:10px 6px;font-size:12px}
+.game-actions .star{border-color:#ffcd9488;color:var(--gold)}
+.score{display:flex;gap:12px;font-size:12px;color:#bfc6de;margin-top:10px;justify-content:space-between}
+.score b{color:#fff}
+
+/* 05 Questions */
+.objective{display:flex;gap:16px;align-items:flex-start;margin-bottom:22px;max-width:1100px}
+.objective .tag{flex:none;background:#70e5d31c;border:1px solid #70e5d366;color:var(--mint);border-radius:999px;padding:6px 12px;font-size:11px;font-weight:850;letter-spacing:.12em}
+.objective p{margin:0;font-size:clamp(16px,1.35vw,19px);line-height:1.5;color:#d5dbef}
+.qgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.qcard{position:relative;text-align:left;color:inherit;border-radius:20px;border:1px solid #39405b;background:linear-gradient(145deg,#1b2136,#121829);padding:22px 22px 18px 92px;min-height:132px;transition:.3s var(--spring);overflow:hidden}
+.qcard:hover{transform:translateY(-4px);border-color:var(--violet)}
+.qcard .num{position:absolute;left:20px;top:18px;font-size:54px;font-weight:900;letter-spacing:-.06em;line-height:1;background:linear-gradient(160deg,var(--violet),var(--mint));-webkit-background-clip:text;background-clip:text;color:transparent}
+.qcard h3{font-size:clamp(19px,1.75vw,25px);margin:0 0 10px}
+.qcard .go{font-size:12px;color:var(--mint);font-weight:800;letter-spacing:.04em}
+.qcard:hover .go{text-decoration:underline}
+.why{margin-top:16px;font-size:14px;color:#aeb8d2}
+.why b{color:var(--gold)}
+
+/* 06 Pipeline temple */
+.temple{max-width:1180px;margin:6px auto 0}
+.pediment{position:relative;height:74px;margin:0 -10px}
+.pediment svg{width:100%;height:100%;display:block}
+.slide.active .pediment{animation:dropIn .8s var(--spring) .95s both}
+@keyframes dropIn{from{opacity:0;transform:translateY(-40px)}}
+.pillars{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:end}
+.pillar{position:relative;border-radius:6px;padding:0;background:transparent;transform-origin:bottom}
+.slide.active .pillar{animation:grow .8s var(--ease) both;animation-delay:calc(var(--i) * 150ms + 150ms)}
+@keyframes grow{from{transform:scaleY(0);opacity:0}}
+.pillar .cap,.pillar .base{height:14px;border-radius:5px;background:linear-gradient(90deg,#3c3266,#b5a0ff,#3c3266);margin:0 -8px}
+.pillar .base{background:linear-gradient(90deg,#1c4b47,#70e5d3,#1c4b47)}
+.pillar .shaft{min-height:clamp(250px,40vh,330px);padding:18px 16px;background:repeating-linear-gradient(90deg,#1b2238 0 18px,#20284200 18px 20px,#1b2238 20px 38px),linear-gradient(180deg,#1f2742,#141a2c);border-left:1px solid #ffffff14;border-right:1px solid #ffffff14;display:flex;flex-direction:column;transition:.3s var(--ease)}
+.pillar:hover .shaft{background:linear-gradient(180deg,#2a2350,#161c33)}
+.pillar:hover{transform:translateY(-6px)}
+.pillar .pi{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:#ffffff10;font-size:22px;margin-bottom:12px}
+.pillar .k{font-size:11px;font-weight:850;letter-spacing:.14em;color:var(--mint)}
+.pillar h3{margin:4px 0 8px}
+.pillar .big{font-size:clamp(28px,2.7vw,40px);font-weight:850;letter-spacing:-.05em;line-height:1;margin:2px 0 10px}
+.pillar ul{list-style:none;padding:0;margin:0;font-size:13px;line-height:1.5;color:#c3cbe2}
+.pillar li{padding-left:16px;position:relative;margin-bottom:5px}
+.pillar li:before{content:"›";position:absolute;left:2px;color:var(--violet);font-weight:900}
+.pillar code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;background:#0c1122;border:1px solid #ffffff1a;border-radius:6px;padding:2px 6px;color:#d7cbff;display:inline-block;margin-top:auto}
+.foundation{margin:10px -10px 0;height:44px;border-radius:10px;background:linear-gradient(90deg,#141b2e,#1c2440,#141b2e);border:1px solid #ffffff17;display:flex;align-items:center;justify-content:space-around;gap:10px;font-size:13px;font-weight:750;color:#d7dcef;position:relative;overflow:hidden;padding:0 14px}
+.foundation span:not(.packet){position:relative;z-index:1;background:#182039;padding:2px 8px;border-radius:6px}
+.foundation b{color:var(--mint);font-variant-numeric:tabular-nums}
+.foundation .arrow{color:var(--violet)}
+.foundation .packet{position:absolute;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:var(--mint);box-shadow:0 0 10px var(--mint);animation:packet 3.6s linear infinite;opacity:.8}
+@keyframes packet{from{left:-2%}to{left:102%}}
+
+/* Charts */
+.viz-card{background:#111829eb;border-radius:22px;border:1px solid #303d59;padding:18px 20px 14px;min-width:0;position:relative}
+.viz-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.viz-title{font-size:16px;font-weight:850;letter-spacing:-.025em;margin-bottom:3px}
+.viz-meta{color:var(--muted);font-size:12px}
+.chart{height:clamp(260px,40vh,380px);min-width:0;position:relative}
+.chart svg{width:100%;height:100%;display:block;overflow:visible}
+.chart svg text{font-family:Inter,"Segoe UI",Arial,sans-serif}
+.legend{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:6px;color:#bbc5de;font-size:12px}
+.legend .sw{display:inline-block;width:10px;height:10px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+.insight{margin-top:12px;border-radius:14px;border:1px solid #49617b91;background:#1726379c;padding:12px 16px;color:#ccddef;font-size:14px;line-height:1.5}
+.insight b{color:var(--mint);text-transform:uppercase;font-size:10px;letter-spacing:.15em;margin-right:10px}
+.tooltip{position:fixed;z-index:99;pointer-events:none;display:none;color:#fff;background:#25253bf0;backdrop-filter:blur(14px);border:1px solid #817db4;border-radius:10px;padding:9px 12px;font-size:12px;line-height:1.6;box-shadow:0 12px 34px #0008;max-width:250px}
+svg .g-bar{transform-box:fill-box;animation:growX .9s var(--ease) both}
+svg .g-barY{transform-box:fill-box;transform-origin:center bottom;animation:growY .9s var(--ease) both}
+svg .g-pop{transform-box:fill-box;transform-origin:center;animation:popIn .5s var(--spring) both}
+svg .g-fade{animation:fadeIn .6s ease both}
+svg .g-slide{animation:slideX 1.1s var(--ease) both}
+svg .g-draw{animation:draw 1.1s var(--ease) both}
+@keyframes growX{from{transform:scaleX(0)}}
+@keyframes growY{from{transform:scaleY(0)}}
+@keyframes fadeIn{from{opacity:0}}
+@keyframes slideX{from{transform:translateX(var(--dx))}}
+@keyframes draw{from{stroke-dashoffset:var(--len)}}
+svg .dim{opacity:.13;transition:opacity .35s}
+svg [data-key]{transition:opacity .25s}
+svg .fade{opacity:.2}
+svg .g-boxin{transform-box:view-box;animation:boxIn .85s var(--ease) both}
+@keyframes boxIn{from{transform:scaleY(0);opacity:0}}
+.chart.tall{height:clamp(280px,42vh,420px)}
+.lg-btn{background:none;border:1px solid #ffffff22;border-radius:999px;color:#c5cce2;font-size:12px;padding:5px 11px;display:inline-flex;align-items:center;gap:7px;transition:.2s}
+.lg-btn i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.lg-btn.off{opacity:.38;text-decoration:line-through}
+.lg-btn:hover{border-color:#ffffff55}
+.ar{width:18px;height:18px;stroke:currentColor;stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.pi svg{width:24px;height:24px;stroke:var(--violet);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.prepared{margin-top:38px;padding-top:16px;border-top:1px solid #ffffff1f;display:inline-flex;gap:10px;align-items:center;font-size:14px;color:var(--sub);letter-spacing:.02em}
+.prepared strong{color:#fff;font-weight:800}
+.prepared .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,var(--violet),var(--mint));color:#151427;font-weight:900;font-size:13px}
+.qr-row{display:flex;align-items:center;gap:26px;margin-top:20px;text-align:left;background:#141b30cc;border:1px solid #39405b;border-radius:24px;padding:18px 26px 18px 18px}
+.qr{display:block;flex:none;width:clamp(120px,17vh,170px);aspect-ratio:1;border-radius:14px;overflow:hidden;box-shadow:0 0 0 4px #b5a0ff55,0 18px 40px #0007;transition:transform .3s var(--spring)}
+.qr:hover{transform:scale(1.05) rotate(-2deg)}
+.qr svg{width:100%;height:100%;display:block}
+.qr-text{display:flex;flex-direction:column;gap:6px;align-items:flex-start;max-width:340px}
+.qr-text .topline{margin:0}
+.qr-text strong{font-size:18px;letter-spacing:-.02em;line-height:1.3}
+.qr-text .btn{margin-top:6px}
+@media(max-width:680px){.qr-row{flex-direction:column;text-align:center;padding:18px}.qr-text{align-items:center}}
+.thanks{text-align:center;display:flex;flex-direction:column;align-items:center}
+.thanks:before{content:"";position:absolute;width:min(70vw,640px);aspect-ratio:1;border-radius:50%;border:1px dashed #aa9bee40;top:50%;left:50%;transform:translate(-50%,-50%);animation:spin 50s linear infinite;z-index:-1}
+.thanks-title{font-size:clamp(72px,10vw,160px);font-weight:850;letter-spacing:-.07em;line-height:.92;margin:0 0 22px}
+.thanks-title .ln{display:inline-block;overflow:hidden;vertical-align:bottom;padding:0 .02em .08em}
+.thanks-title .ln>span{display:inline-block}
+.slide.active .thanks-title .ln>span{animation:lineUp .9s var(--ease) both}
+.slide.active .thanks-title .ln:nth-child(2)>span{animation-delay:.15s}
+svg [data-hit]{cursor:help}
+.side-panel{background:linear-gradient(135deg,#2d224c,#161f35);border:1px solid #8f80cb;border-radius:22px;padding:22px;min-width:0;display:flex;flex-direction:column}
+.side-panel .big-stat{font-size:clamp(44px,5vw,76px);font-weight:850;letter-spacing:-.07em;line-height:1;margin:12px 0}
+.side-panel p{color:#c2c7e1;line-height:1.6;font-size:15px}
+.pill-o{border:1px solid #ffffff35;border-radius:999px;padding:6px 11px;color:#d8d2ee;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:6px;align-self:flex-start}
+
+/* Guess overlay */
+.guess{position:absolute;inset:0;z-index:5;border-radius:22px;background:#0d1222f5;backdrop-filter:blur(14px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:20px;transition:opacity .45s,visibility .45s}
+.guess.gone{opacity:0;visibility:hidden}
+.guess h3{font-size:clamp(22px,2.4vw,34px);margin:0}
+.guess .opts{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.guess .opts .btn{font-size:15px;padding:13px 20px;border-color:var(--c)}
+.guess .opts .btn:hover{background:var(--c);color:#121225}
+.guess .skip{background:none;border:0;color:var(--muted);font-size:12px;text-decoration:underline}
+.verdict{font-weight:850;font-size:15px;min-height:22px;color:var(--mint)}
+.verdict.no{color:var(--gold)}
+.reveal-hide{opacity:0;transform:translateY(12px);transition:.6s var(--ease)}
+.reveal-hide.shown{opacity:1;transform:none}
+
+/* Answers */
+.answers{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.flip{perspective:1200px;min-height:170px;border:0;background:none;padding:0;color:inherit;text-align:left}
+.flip .in{position:relative;width:100%;height:100%;min-height:170px;transition:transform .7s var(--spring);transform-style:preserve-3d}
+.flip.on .in{transform:rotateY(180deg)}
+.flip .face{position:absolute;inset:0;border-radius:19px;padding:22px;backface-visibility:hidden;-webkit-backface-visibility:hidden;border:1px solid #ffffff25;display:flex;flex-direction:column;justify-content:center}
+.flip .front{background:linear-gradient(145deg,#272044,#141c33);border-color:#ad98f888}
+.flip .front .qn{font-size:12px;font-weight:850;letter-spacing:.14em;color:var(--violet);margin-bottom:8px}
+.flip .front h3{font-size:clamp(20px,2vw,28px);margin:0}
+.flip .front .hint{margin-top:12px;font-size:12px;color:var(--muted)}
+.flip .back{background:#171d30;transform:rotateY(180deg);border-color:#70e5d366}
+.flip .back b{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--mint);margin-bottom:8px}
+.flip .back strong{font-size:clamp(20px,2.1vw,28px);letter-spacing:-.04em;line-height:1.15;margin-bottom:8px}
+.flip .back p{color:var(--sub);line-height:1.5;font-size:14px;margin:0}
+.flip .back .n{color:#fff;font-weight:800}
+
+/* Conclusion */
+.conclusion-hero{font-size:clamp(34px,4.7vw,68px);font-weight:820;letter-spacing:-.06em;line-height:1.1;max-width:1180px;margin-bottom:24px}
+.conclusion-hero .strike{position:relative;color:#8b93ae}
+.conclusion-hero .strike:after{content:"";position:absolute;left:0;right:0;top:55%;height:5px;border-radius:4px;background:var(--rose);transform:scaleX(0);transform-origin:left}
+.slide.active .conclusion-hero .strike:after{animation:strike .7s var(--ease) 1.1s forwards}
+@keyframes strike{to{transform:scaleX(1)}}
+.source-links{display:flex;flex-wrap:wrap;gap:12px}
+.source-links a{color:#c6b8ff;text-decoration:none;border-bottom:1px solid #a9a0d868;font-size:13px;padding-bottom:4px}
+.source-links a:hover{color:#fff}
+
+/* Modals */
+.modal{position:fixed;inset:0;background:#050710db;z-index:50;display:none;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(10px)}.modal.show{display:flex}
+.modal-panel{width:min(970px,100%);max-height:88vh;overflow:auto;background:#11182b;border:1px solid #505778;border-radius:24px;padding:28px;animation:popIn .35s var(--spring)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}.modal-head h3{margin:0;font-size:26px}
+.overview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.slide-pick{background:#1a2237;color:#fff;text-align:left;border:1px solid #303d59;padding:16px;border-radius:15px;min-height:96px;transition:.2s}
+.slide-pick:hover{border-color:#a696f9;background:#242343;transform:translateY(-2px)}
+.slide-pick small{display:block;color:var(--mint);font-size:11px;margin-bottom:8px;letter-spacing:.1em}.slide-pick strong{font-size:16px}
+.notes-body{font-size:16px;color:#d9d8eb;line-height:1.8}.notes-body strong{color:var(--mint)}
+.toast{position:fixed;top:84px;right:22px;background:#243044;color:#fff;border:1px solid #8497bb;border-radius:12px;padding:12px 16px;font-weight:650;font-size:13px;z-index:60;transform:translateY(-10px);opacity:0;pointer-events:none;transition:.2s}.toast.show{transform:none;opacity:1}
+
+/* Compact heights */
+@media(max-height:820px) and (min-width:900px){
+  .slide{padding-top:14px;padding-bottom:12px}
+  .eyebrow{margin-bottom:10px}
+  h2{font-size:clamp(32px,3.7vw,50px);margin-bottom:9px}
+  .subhead{font-size:15px;margin-bottom:10px}
+  .chart{height:250px}
+  .chart.tall{height:270px}
+  .pillar .shaft{min-height:228px;padding:13px}
+  .pillar ul{font-size:12px}
+  .pediment{height:54px}
+  .opt{min-height:170px}
+  .qcard{min-height:108px;padding-top:16px}
+  .flip,.flip .in{min-height:136px}
+  .insight{margin-top:8px;padding:9px 14px}
+  .tl{padding:18px}
+  .callout{margin-top:9px;padding:9px 13px}
+  .conclusion-hero{font-size:clamp(32px,4vw,54px);margin-bottom:14px}
+}
+@media (max-width:1000px){
+  .cover-grid{grid-template-columns:1fr}.orbit{display:none}
+  .timeline{grid-template-columns:1fr;gap:8px}.tl-arrow{height:52px}.tl-arrow svg{transform:rotate(90deg);animation-name:nudgeY}
+  .task-grid{grid-template-columns:1fr 1fr}.task-grid .game{grid-column:1/-1}
+  .pillars{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:24px}
+  .stack{grid-template-columns:1fr!important}
+  .qtrack .lbl{display:none}
+  .slide{justify-content:flex-start!important}
+}
+@media (max-width:680px){
+  .topbar{height:62px;padding:0 14px}.brand .mute,.brand .txt{display:none}
+  .footer{height:62px;padding:0 14px}.progress-track{position:relative;bottom:auto}.footer-hint,.hide-mobile{display:none!important}
+  .slide{padding:26px 16px;min-height:calc(100svh - 124px)}
+  .poll{grid-template-columns:1fr 1fr}.opt{min-height:150px}
+  .conds{grid-template-columns:repeat(2,1fr)}
+  .task-grid,.grid2,.answers,.qgrid,.pillars{grid-template-columns:1fr}
+  .qcard{padding-left:76px}.qcard .num{font-size:42px}
+  .chart{height:300px;overflow-x:auto;overflow-y:hidden}.chart svg{min-width:560px}
+  .nav-btn{min-width:52px;padding:10px}.nav-btn .label{display:none}
+  .overview-grid{grid-template-columns:repeat(2,1fr)}
+  .qchip{width:28px;height:26px;font-size:10px}
+  .foundation{font-size:11px;height:auto;padding:8px;flex-wrap:wrap}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.rv{opacity:1}}
+@media print{
+  @page{size:landscape;margin:0}
+  html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .topbar,.footer,.progress-track,.modal,.toast,.tooltip,.guess,#fx,.blob{display:none!important}
+  .slide,.slide.active{display:flex!important;height:100vh;min-height:100vh;break-after:page;padding:36px 56px!important;animation:none!important}
+  *{animation:none!important}.rv,.reveal-hide{opacity:1!important;transform:none!important}
+  .flip .in{transform:none!important}.flip .back{display:none}
+}
+</style>
+</head>
+<body>
+<div aria-hidden="true" class="ambient"></div>
+<div aria-hidden="true" class="blob a"></div><div aria-hidden="true" class="blob b"></div>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">B</span><span class="txt">BEYOND THE SCROLL</span> <span class="mute">/ data story</span></div>
+  <div class="qtrack" aria-label="Research questions answered so far">
+    <span class="lbl">Questions</span>
+    <span class="qchip" data-q="1" title="Q1 · Did performance change?">Q1</span>
+    <span class="qchip" data-q="2" title="Q2 · Did the groups differ?">Q2</span>
+    <span class="qchip" data-q="3" title="Q3 · Did the two tasks differ?">Q3</span>
+    <span class="qchip" data-q="4" title="Q4 · Faster = less accurate?">Q4</span>
+  </div>
+  <div class="tools">
+    <button aria-label="Presenter notes" class="icon-btn" id="notesButton" title="Presenter notes (N)">☷</button>
+    <button aria-label="Slide overview" class="icon-btn" id="gridButton" title="All slides (G)">▦</button>
+    <button aria-label="Fullscreen" class="icon-btn hide-mobile" id="fullscreenButton" title="Fullscreen (F)">⛶</button>
+  </div>
+</header>
+
+<main class="deck" id="deck">
+
+<!-- 01 COVER -->
+<section class="slide active" data-title="Beyond the Scroll" data-note="Introduce the one-sentence idea: this project explores how different kinds of breaks relate to remembering an intention. It combines EDA in a notebook with an interactive Streamlit app.">
+  <div class="inner cover-grid">
+    <div>
+      <p class="eyebrow rv">An EDA project &amp; interactive experience</p>
+      <h1 class="hero-title"><span class="ln"><span>BEYOND</span></span><span class="ln"><span>THE</span></span><span class="ln"><span class="scrollword">SCROLL.</span></span></h1>
+      <p class="lede rv" style="--i:4">Short videos. Small interruptions.<br/><strong style="color:#fff">What happens to our memory afterward?</strong></p>
+      <div class="start-row rv" style="--i:6">
+        <button class="btn primary" onclick="go(1)">Let's find out →</button>
+        <span class="small">or press <span class="kbd">→</span> / <span class="kbd">Space</span></span>
+      </div>
+      <div class="prepared rv" style="--i:8"><span class="av">F</span><span>Prepared by <strong>Fay Altheeb</strong></span></div>
+    </div>
+    <div aria-hidden="true" class="orbit pop" style="--i:3">
+      <div class="ring"></div><div class="ring two"></div>
+      <div class="phone"><div class="feed"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><small>REMEMBER</small><strong id="phoneWord">CLOUD</strong><small id="phoneSub">real word?</small></div>
+      <span class="chip c1">⌁ scrolling</span><span class="chip c2">↗ remembering</span><span class="chip c3">◉ attention</span>
+    </div>
+  </div>
+</section>
+
+<!-- 02 POLL -->
+<section class="slide" data-title="How do you spend your break?" data-note="Ask the room: when you take a short break, what do you do? Click a card for each raised hand — the counts are live. Then transition: do these breaks all affect performance the same way?">
+  <div class="inner">
+    <p class="eyebrow rv">01 / Quick poll</p>
+    <h2 class="rv" style="--i:1">How do you spend <span class="hl">your break?</span></h2>
+    <p class="subhead rv" style="--i:2">Tap a card for every hand in the room</p>
+    <div class="poll">
+      <button class="opt rv" style="--i:3" data-opt="tiktok"><span class="count">0</span><div class="ico" style="color:#d6adff;background:#bd8bff19"><svg viewBox="0 0 64 64" fill="none"><path d="M36 9v28a11 11 0 1 1-11-11" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><path d="M36 11c2 9 8 14 18 15" stroke="currentColor" stroke-width="6" stroke-linecap="round"/></svg></div><h3>TikTok</h3><p>Endless scrolling</p><span class="fill"></span></button>
+      <button class="opt rv" style="--i:4" data-opt="youtube"><span class="count">0</span><div class="ico" style="color:var(--gold);background:#ffcd9419"><svg viewBox="0 0 64 64" fill="none"><rect x="7" y="15" width="50" height="34" rx="11" stroke="currentColor" stroke-width="4"/><path d="M28 24 43 32 28 40Z" fill="currentColor"/></svg></div><h3>YouTube</h3><p>Watching videos</p><span class="fill"></span></button>
+      <button class="opt rv" style="--i:5" data-opt="twitter"><span class="count">0</span><div class="ico" style="color:var(--blue);background:#8ea8ff16"><svg viewBox="0 0 64 64" fill="none"><path d="M15 12 49 52M45 12 19 52" stroke="currentColor" stroke-width="5" stroke-linecap="round"/></svg></div><h3>Twitter / X</h3><p>Checking updates</p><span class="fill"></span></button>
+      <button class="opt rv" style="--i:6" data-opt="rest"><span class="count">0</span><div class="ico" style="color:var(--mint);background:#70e5d317"><svg viewBox="0 0 64 64" fill="none"><path d="M42 12a22 22 0 1 0 10 39A23 23 0 0 1 42 12Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/></svg></div><h3>Rest</h3><p>No screens</p><span class="fill"></span></button>
+    </div>
+    <div class="poll-q rv" style="--i:7"><p>Do all breaks affect our <span class="hl-mint">memory</span> the same way?</p><button class="btn" id="pollReset" style="font-size:12px">↺ Reset poll</button></div>
+  </div>
+</section>
+
+<!-- 03 STUDY -->
+<section class="slide" data-title="How the study worked" data-note="This is a published experiment (60 people, 15 per group), not one we ran ourselves. Everyone did the same tasks before and after a break; only the break was different.">
+  <div class="inner">
+    <p class="eyebrow rv">02 / The original experiment</p>
+    <h2 class="rv" style="--i:1">One study.<br/><span class="hl">Four kinds of break.</span></h2>
+    <p class="subhead rv" style="--i:2">60 participants did the same memory tasks before and after an assigned interruption.</p>
+    <div class="timeline">
+      <div class="tl rv" style="--i:3"><div class="step-no">01 / BEFORE</div><h3>PRE test</h3><p>Word decisions, while remembering a special rule.</p></div>
+      <div class="tl-arrow rv" style="--i:4"><span class="arr"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+      <div class="tl focus rv" style="--i:5"><div class="step-no">02 / THE BREAK</div><h3>One of four conditions</h3>
+        <div class="conds">
+          <div class="cond" style="--c:var(--violet)"><i>♪</i><strong>TikTok</strong><span>15 people</span></div>
+          <div class="cond" style="--c:var(--gold)"><i>▶</i><strong>YouTube</strong><span>15 people</span></div>
+          <div class="cond" style="--c:var(--blue)"><i>✳</i><strong>Twitter/X</strong><span>15 people</span></div>
+          <div class="cond" style="--c:var(--mint)"><i>☾</i><strong>Rest</strong><span>15 people</span></div>
+        </div></div>
+      <div class="tl-arrow rv" style="--i:6"><span class="arr"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+      <div class="tl rv" style="--i:7"><div class="step-no">03 / AFTER</div><h3>POST test</h3><p>Same tasks again → compare with PRE.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 TASKS -->
+<section class="slide" data-title="Two tasks (try it!)" data-note="LD is the ongoing task: is this a real word? PM is remembering to act on a planned cue. Invite a volunteer to play the 20-second game — it shows how easy it is to forget the special rule while busy. LD happens far more often by design.">
+  <div class="inner">
+    <p class="eyebrow rv">03 / The two tasks</p>
+    <h2 class="rv" style="--i:1">Two tasks. <span class="hl">Different demands.</span></h2>
+    <div class="task-grid">
+      <div class="card rv" style="--i:2;border-top:3px solid var(--violet)"><span class="topline">LD · Lexical Decision</span><h3>“Is this a real word?”</h3><div class="sample">CLOUD</div><p>The busy, ongoing task. Happens constantly — <b style="color:#fff">19,698</b> trials.</p></div>
+      <div class="card rv" style="--i:3;border-top:3px solid var(--mint)"><span class="topline">PM · Prospective Memory</span><h3>“Remember the special rule.”</h3><div class="sample" style="color:var(--mint)">TIGER ★</div><p>Act on a planned cue when it appears. Rare by design — <b style="color:#fff">1,781</b> trials.</p></div>
+      <div class="game rv" style="--i:4" id="game">
+        <span class="topline">Try it yourself · 20 seconds</span>
+        <p class="rule">Decide <b>real word</b> or <b>made-up</b>. But if you see an <b>ANIMAL</b>, hit ★ instead!</p>
+        <div class="stage" id="stage"><span class="word" id="gWord">Ready?</span><span class="timer" id="gTimer" style="width:0"></span></div>
+        <div class="game-actions" id="gActions">
+          <button class="btn" data-a="real">✓ Real</button>
+          <button class="btn" data-a="fake">✗ Made-up</button>
+          <button class="btn star" data-a="star">★ Animal!</button>
+        </div>
+        <button class="btn primary" id="gStart" style="margin-top:10px">▶ Start</button>
+        <div class="score"><span>LD: <b id="gLD">0/0</b></span><span>PM remembered: <b id="gPM">0/0</b></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 RESEARCH QUESTIONS -->
+<section class="slide" data-title="Our research questions" data-q="" data-note="Read the objective, then the four questions from the notebook. Each question lights up in the top bar when the slide that answers it comes up — the audience can track progress. Click a card to jump straight to its answer.">
+  <div class="inner">
+    <p class="eyebrow rv">04 / What we want to know</p>
+    <h2 class="rv" style="--i:1">Four questions <span class="hl">to guide the data.</span></h2>
+    <div class="objective rv" style="--i:2"><span class="tag">OBJECTIVE</span><p>Explore how changes in memory-task performance and response times differ across the four experimental groups.</p></div>
+    <div class="qgrid">
+      <button class="qcard rv" style="--i:3" data-jump="6"><span class="num">01</span><h3>How does performance change from before to after the interruption?</h3><span class="go">See the answer →</span></button>
+      <button class="qcard rv" style="--i:4" data-jump="6"><span class="num">02</span><h3>Does this change differ between TikTok, Twitter, YouTube, and Rest?</h3><span class="go">See the answer →</span></button>
+      <button class="qcard rv" style="--i:5" data-jump="7"><span class="num">03</span><h3>Do the two task types show different patterns?</h3><span class="go">See the answer →</span></button>
+      <button class="qcard rv" style="--i:6" data-jump="8"><span class="num">04</span><h3>Are faster responses associated with lower accuracy?</h3><span class="go">See the answer →</span></button>
+    </div>
+    <p class="why rv" style="--i:7"><b>Why this dataset?</b> It lets us test the popular idea of “brain rot” with evidence — without assuming permanent brain damage.</p>
+  </div>
+</section>
+
+<!-- 06 PIPELINE -->
+<section class="slide" data-title="From raw to ready" data-note="One slide for the whole process. Pillar 1: we inspected shape, types, missing values, duplicates. Pillar 2: removed 1 exact duplicate, kept missing response times as missing instead of inventing values, renamed 4 columns, stored IDs as text. Pillar 3: engineered stimulus_length and accuracy_change = POST − PRE per participant (practice/TRAIN trials excluded). Pillar 4: univariate → bivariate → correlations, keeping only the plots that answer our questions.">
+  <div class="inner">
+    <p class="eyebrow rv">05 / The process</p>
+    <h2 class="rv" style="--i:1">Four pillars hold up <span class="hl">every insight.</span></h2>
+    <div class="temple">
+      <div class="pediment" aria-hidden="true"><svg viewBox="0 0 1000 74" preserveAspectRatio="none"><defs><linearGradient id="pg" x1="0" x2="1"><stop offset="0" stop-color="#3c3266"/><stop offset=".5" stop-color="#5a46a8"/><stop offset="1" stop-color="#3c3266"/></linearGradient></defs><path d="M0 74 L500 4 L1000 74 Z" fill="url(#pg)" stroke="#b5a0ff" stroke-width="2" vector-effect="non-scaling-stroke"/><text x="500" y="60" text-anchor="middle" fill="#f7f4ff" font-size="17" font-weight="850" letter-spacing="4" font-family="Inter,Segoe UI,sans-serif">TRUSTWORTHY INSIGHTS</text></svg></div>
+      <div class="pillars">
+        <div class="pillar" style="--i:0"><div class="cap"></div><div class="shaft"><div class="pi"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></div><span class="k">PILLAR 01</span><h3>Understand</h3><div class="big" data-count="21480">0</div>
+          <ul><li>rows of task attempts, 8 columns</li><li>103 missing response times</li><li>1 exact duplicate found</li></ul><code>df.info() · df.isnull()</code></div><div class="base"></div></div>
+        <div class="pillar" style="--i:1"><div class="cap"></div><div class="shaft"><div class="pi"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 6v13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6M10 10v6M14 10v6M9 6V4h6v2"/></svg></div><span class="k">PILLAR 02</span><h3>Clean</h3><div class="big" data-count="21479">0</div>
+          <ul><li>duplicate removed</li><li>missing times kept, <i>not</i> invented</li><li>4 columns renamed · IDs → text</li></ul><code>drop_duplicates()</code></div><div class="base"></div></div>
+        <div class="pillar" style="--i:2"><div class="cap"></div><div class="shaft"><div class="pi"><svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="4"/></svg></div><span class="k">PILLAR 03</span><h3>Engineer</h3><div class="big">POST−PRE</div>
+          <ul><li><b>accuracy_change</b> per participant</li><li><b>stimulus_length</b> = letters per word</li><li>practice (TRAIN) trials excluded</li></ul><code>pivot → post − pre</code></div><div class="base"></div></div>
+        <div class="pillar" style="--i:3"><div class="cap"></div><div class="shaft"><div class="pi"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div><span class="k">PILLAR 04</span><h3>Explore</h3><div class="big" data-count="4">0</div>
+          <ul><li>univariate → bivariate → correlations</li><li>kept only plots that answer a question</li><li>insights checked against the data</li></ul><code>seaborn · matplotlib</code></div><div class="base"></div></div>
+      </div>
+      <div class="foundation rv" style="--i:6"><span class="packet"></span><span class="packet" style="animation-delay:-1.2s"></span><span class="packet" style="animation-delay:-2.4s"></span>
+        <span><b>21,480</b> raw trials</span><span class="arrow">→</span><span><b>21,479</b> clean trials</span><span class="arrow">→</span><span><b>120</b> participant × task change scores</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 07 PM BEFORE/AFTER -->
+<section class="slide" data-title="Memory before vs after" data-q="1,2" data-note="Main result. Ask the audience to guess first! TikTok PM accuracy fell from about 78% to 47% (−31 pp) — 12 of 15 TikTok participants declined. Rest and Twitter improved; YouTube was roughly flat. Descriptive only — not a significance test or causal proof.">
+  <div class="inner">
+    <p class="eyebrow rv">06 / Insight #1 <span class="qbadge"><span>Q1</span><span>Q2</span></span></p>
+    <h2 class="rv" style="--i:1">Which break hurt <span class="hl">remembering</span> the most?</h2>
+    <div class="grid2 stack" style="grid-template-columns:1.65fr .85fr;align-items:stretch">
+      <div class="viz-card rv" style="--i:2">
+        <div class="guess" id="guess">
+          <h3>Make your guess</h3>
+          <p class="small" style="margin:0">Which group's prospective memory dropped most after the break?</p>
+          <div class="opts">
+            <button class="btn" style="--c:var(--violet)" data-g="tiktok">TikTok</button>
+            <button class="btn" style="--c:var(--gold)" data-g="youtube">YouTube</button>
+            <button class="btn" style="--c:var(--blue)" data-g="twitter">Twitter / X</button>
+            <button class="btn" style="--c:var(--mint)" data-g="rest">Rest</button>
+          </div>
+          <button class="skip" data-g="">just show me</button>
+        </div>
+        <div class="viz-head"><div><div class="viz-title">Remembering the planned action (PM)</div><div class="viz-meta">Participant-average PM accuracy · before ● → after ●</div></div><button class="btn" id="replayPM" style="font-size:12px;padding:7px 12px">↻ Replay</button></div>
+        <div class="chart" id="pmChart" role="img" aria-label="PM accuracy before and after for four groups. TikTok drops from 78% to 47%."></div>
+        <div class="legend"><span><i class="sw" style="background:#8b98b6"></i>Before</span><span><i class="sw" style="background:linear-gradient(90deg,#70e5d3,#b5a0ff,#8eb6ff,#ffcd94)"></i>After · group colour</span></div>
+      </div>
+      <div class="side-panel reveal-hide" id="pmPanel">
+        <div class="verdict" id="verdict"></div>
+        <span class="pill-o">◉ Biggest change</span>
+        <div class="big-stat hl-rose" id="pmDrop">−31 pp</div>
+        <h3>TikTok's PM accuracy fell from 78% → 47%</h3>
+        <p><b style="color:#fff">12 of 15</b> TikTok participants declined. Rest <b class="hl-mint">+6.5</b> and Twitter <b class="hl-mint">+11.4</b> improved; YouTube stayed flat (−0.9).</p>
+        <p class="small" style="margin-top:auto">Descriptive comparison — not proof that a platform causes memory loss.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 08 LD vs PM CHANGE -->
+<section class="slide" data-title="LD vs PM change" data-q="1,3" data-note="POST minus PRE in percentage points. LD bars hug zero for every group; PM bars swing widely. Toggle LD / PM to show each on its own. Across participants, LD change varies by only ~1.8 pp (standard deviation) versus ~24 pp for PM.">
+  <div class="inner">
+    <p class="eyebrow rv">07 / Insight #2 <span class="qbadge"><span>Q1</span><span>Q3</span></span></p>
+    <h2 class="rv" style="--i:1">Words stayed steady. <span class="hl">Intentions didn't.</span></h2>
+    <div class="viz-card rv" style="--i:2">
+      <div class="viz-head"><div><div class="viz-title">Change in accuracy after the break (POST − PRE)</div><div class="viz-meta">Percentage points · dashed line = no change</div></div>
+        <div class="seg" id="chgSeg"><button class="btn sel" data-m="both">Both</button><button class="btn" data-m="LD">LD only</button><button class="btn" data-m="PM">PM only</button></div></div>
+      <div class="chart" id="changeChart" role="img" aria-label="Diverging bars of accuracy change for LD and PM by group."></div>
+      <div class="legend"><span><i class="sw" style="background:#b7a2ff"></i>Lexical Decision</span><span><i class="sw" style="background:#70e5d3"></i>Prospective Memory</span></div>
+    </div>
+    <div class="insight rv" style="--i:3"><b>Insight</b> LD barely moves (every group within ±1 pp). PM swings from <b style="all:unset;color:var(--rose);font-weight:800">−31</b> to <b style="all:unset;color:var(--mint);font-weight:800">+11</b> pp. Participant-level spread: LD ≈ <span class="hl-gold" style="font-weight:800">1.8 pp</span> vs PM ≈ <span class="hl-gold" style="font-weight:800">24 pp</span>.</div>
+  </div>
+</section>
+
+<!-- 09 RESPONSE TIME BOX PLOT -->
+<section class="slide" data-title="Everyone got a bit faster" data-q="4" data-note="The response-time box plot from the notebook: one value per participant (their mean response time), split by task, before (grey) vs after (colour). PM takes longer than LD. In every group the average response time drops after the break (most medians drop too), so people answered slightly faster. Hover a box for details, click a group to focus it. Then point out TikTok: faster, yet PM accuracy fell from 78% to 47%.">
+  <div class="inner">
+    <p class="eyebrow rv">08 / Insight #3 <span class="qbadge"><span>Q4</span></span></p>
+    <h2 class="rv" style="--i:1">Everyone got <span class="hl">a bit faster.</span></h2>
+    <div class="viz-card rv" style="--i:2">
+      <div class="viz-head"><div><div class="viz-title">Response time before vs after the break · box plot</div><div class="viz-meta">One value per participant (mean response time) · lower = faster · hover a box for details · click a group to focus</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><div class="seg" id="rtSeg"><button class="btn sel" data-m="both">LD + PM</button><button class="btn" data-m="LD">LD only</button><button class="btn" data-m="PM">PM only</button></div><button class="btn sel" id="rtPts" style="padding:7px 13px;font-size:12px;border-radius:10px">Participants: on</button></div></div>
+      <div class="chart tall" id="rtBoxChart" role="img" aria-label="Box plots of participant mean response time before and after the break, for LD and PM, by group. Medians are lower after the break in every group."></div>
+      <div class="legend"><span><i class="sw" style="background:#8b98b6"></i>Before (PRE)</span><span><i class="sw" style="background:linear-gradient(90deg,#70e5d3,#b5a0ff,#8eb6ff,#ffcd94)"></i>After (POST) · group colour</span><span>Box = middle 50% · white line = median · whiskers = typical range</span><span><i class="sw" style="background:none;border:1.6px solid #fff;border-radius:50%"></i>Outlier</span></div>
+    </div>
+    <div class="insight rv" style="--i:3" id="rtInsight"></div>
+  </div>
+</section>
+
+<!-- 10 SPEED VS ACCURACY -->
+<section class="slide" data-title="Faster ≠ less accurate" data-q="4" data-note="One dot per participant: mean response time vs accuracy. Toggle PM / LD. The trend lines are weak: LD r ≈ +0.10, PM r ≈ −0.25. Faster responses do not consistently mean lower accuracy. Click groups in the legend to show or hide them. The LD outlier (participant 310, about 2% accuracy) was flagged and checked, not deleted.">
+  <div class="inner">
+    <p class="eyebrow rv">09 / Insight #4 <span class="qbadge"><span>Q4</span></span></p>
+    <h2 class="rv" style="--i:1">Faster didn't mean <span class="hl">less accurate.</span></h2>
+    <div class="viz-card rv" style="--i:2">
+      <div class="viz-head"><div><div class="viz-title">Speed vs accuracy</div><div class="viz-meta">One dot per participant · <span id="rLabel"></span></div></div>
+        <div class="seg" id="spdSeg"><button class="btn sel" data-t="PM">PM</button><button class="btn" data-t="LD">LD</button></div></div>
+      <div class="chart tall" id="speedChart" role="img" aria-label="Scatterplot of participant mean response time vs accuracy with a weak trend line."></div>
+      <div class="legend" id="spdLegend"></div>
+    </div>
+    <div class="insight rv" style="--i:3"><b>Insight</b> The trend line is almost flat: speed and accuracy are only <span style="color:#fff;font-weight:800">weakly</span> linked (LD r ≈ +0.10, PM r ≈ −0.25). Fast responders can be accurate, and slow ones can still miss the cue.</div>
+  </div>
+</section>
+
+<!-- 11 ANSWERS -->
+<section class="slide" data-title="Answers to our questions" data-q="1,2,3,4" data-note="Ask the audience to answer each question before flipping the card. Then flip to reveal the data's answer.">
+  <div class="inner">
+    <p class="eyebrow rv">10 / Back to our questions</p>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap"><h2 class="rv" style="--i:1;margin-bottom:0">What did the data <span class="hl">actually say?</span></h2><button class="btn rv" style="--i:2" id="flipAll">⟲ Flip all</button></div>
+    <div class="answers">
+      <button class="flip rv" style="--i:3"><div class="in"><div class="face front"><span class="qn">Q1</span><h3>Did performance change after the interruption?</h3><span class="hint">tap to reveal ↻</span></div><div class="face back"><b>Q1 · Performance</b><strong>Yes — but depends on the task.</strong><p>LD stayed within <span class="n">±1 pp</span> in every group; PM moved much more.</p></div></div></button>
+      <button class="flip rv" style="--i:4"><div class="in"><div class="face front"><span class="qn">Q2</span><h3>Did TikTok, Twitter, YouTube and Rest differ?</h3><span class="hint">tap to reveal ↻</span></div><div class="face back"><b>Q2 · Groups</b><strong>Yes — TikTok stood out.</strong><p>TikTok PM <span class="n">−31 pp</span> (12/15 declined). Twitter <span class="n">+11</span>, Rest <span class="n">+6.5</span>, YouTube ≈ flat.</p></div></div></button>
+      <button class="flip rv" style="--i:5"><div class="in"><div class="face front"><span class="qn">Q3</span><h3>Did the two task types show different patterns?</h3><span class="hint">tap to reveal ↻</span></div><div class="face back"><b>Q3 · Tasks</b><strong>Very clearly.</strong><p>Remembering an intention (PM) varied ~<span class="n">13×</span> more than word decisions (LD).</p></div></div></button>
+      <button class="flip rv" style="--i:6"><div class="in"><div class="face front"><span class="qn">Q4</span><h3>Are faster responses linked to lower accuracy?</h3><span class="hint">tap to reveal ↻</span></div><div class="face back"><b>Q4 · Speed</b><strong>Not necessarily.</strong><p>Everyone sped up after the break; correlations are weak (LD r ≈ <span class="n">+0.10</span>, PM r ≈ <span class="n">−0.25</span>).</p></div></div></button>
+    </div>
+  </div>
+</section>
+
+<!-- 12 CONCLUSION -->
+<section class="slide" data-title="Conclusion" data-note="Conclude: the break didn't change how well people recognised words; it changed whether they remembered to act on an intention, most visibly after TikTok. Then the limits: one experiment, exploratory and descriptive, no causal or long-term claim.">
+  <div class="inner">
+    <p class="eyebrow rv">11 / Conclusion</p>
+    <div class="conclusion-hero rv" style="--i:1">The break didn't change how we <span class="strike">read words.</span><br/>It changed whether we <span class="hl-mint">remembered what we meant to do.</span></div>
+    <div class="grid2">
+      <div class="card accent rv" style="--i:3"><span class="topline">What we learned</span><p>Prospective memory is far more sensitive to interruptions than word recognition, and the TikTok group showed the clearest average decline. The type of break seems to matter.</p></div>
+      <div class="card soft rv" style="--i:4"><span class="topline" style="color:var(--gold)">What we can't conclude</span><p>One experiment, exploratory analysis. It doesn't prove TikTok causes memory loss, show lasting effects, or replace the study's statistical tests.</p></div>
+    </div>
+    <div class="callout rv" style="--i:5"><strong>Key takeaway:</strong> if you need to remember to do something after a break, the kind of break you take may matter.</div>
+  </div>
+</section>
+
+<!-- 13 THANK YOU -->
+<section class="slide" data-title="Thank you" data-note="Thank the audience and open the floor for questions. Leave this slide up so people can scan the QR code to open the Streamlit app.">
+  <div class="inner thanks">
+    <p class="eyebrow rv">Beyond the Scroll</p>
+    <h1 class="thanks-title"><span class="ln"><span>Thank</span></span> <span class="ln"><span class="scrollword">you.</span></span></h1>
+    <p class="lede rv" style="--i:4">Questions, thoughts, or your own break habits? Let's talk.</p>
+    <div class="qr-row rv" style="--i:5">
+      <a class="qr" href="https://eda-project-brain-rot.streamlit.app" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 37 37" shape-rendering="crispEdges" role="img" aria-label="QR code linking to https://eda-project-brain-rot.streamlit.app"><rect width="37" height="37" fill="#fff"/><path d="M2,2h1v1h-1zM3,2h1v1h-1zM4,2h1v1h-1zM5,2h1v1h-1zM6,2h1v1h-1zM7,2h1v1h-1zM8,2h1v1h-1zM15,2h1v1h-1zM21,2h1v1h-1zM22,2h1v1h-1zM24,2h1v1h-1zM25,2h1v1h-1zM28,2h1v1h-1zM29,2h1v1h-1zM30,2h1v1h-1zM31,2h1v1h-1zM32,2h1v1h-1zM33,2h1v1h-1zM34,2h1v1h-1zM2,3h1v1h-1zM8,3h1v1h-1zM10,3h1v1h-1zM12,3h1v1h-1zM15,3h1v1h-1zM16,3h1v1h-1zM18,3h1v1h-1zM19,3h1v1h-1zM22,3h1v1h-1zM24,3h1v1h-1zM25,3h1v1h-1zM28,3h1v1h-1zM34,3h1v1h-1zM2,4h1v1h-1zM4,4h1v1h-1zM5,4h1v1h-1zM6,4h1v1h-1zM8,4h1v1h-1zM10,4h1v1h-1zM12,4h1v1h-1zM15,4h1v1h-1zM17,4h1v1h-1zM18,4h1v1h-1zM20,4h1v1h-1zM24,4h1v1h-1zM28,4h1v1h-1zM30,4h1v1h-1zM31,4h1v1h-1zM32,4h1v1h-1zM34,4h1v1h-1zM2,5h1v1h-1zM4,5h1v1h-1zM5,5h1v1h-1zM6,5h1v1h-1zM8,5h1v1h-1zM12,5h1v1h-1zM13,5h1v1h-1zM14,5h1v1h-1zM16,5h1v1h-1zM20,5h1v1h-1zM24,5h1v1h-1zM26,5h1v1h-1zM28,5h1v1h-1zM30,5h1v1h-1zM31,5h1v1h-1zM32,5h1v1h-1zM34,5h1v1h-1zM2,6h1v1h-1zM4,6h1v1h-1zM5,6h1v1h-1zM6,6h1v1h-1zM8,6h1v1h-1zM11,6h1v1h-1zM12,6h1v1h-1zM13,6h1v1h-1zM14,6h1v1h-1zM15,6h1v1h-1zM17,6h1v1h-1zM18,6h1v1h-1zM19,6h1v1h-1zM20,6h1v1h-1zM26,6h1v1h-1zM28,6h1v1h-1zM30,6h1v1h-1zM31,6h1v1h-1zM32,6h1v1h-1zM34,6h1v1h-1zM2,7h1v1h-1zM8,7h1v1h-1zM12,7h1v1h-1zM14,7h1v1h-1zM15,7h1v1h-1zM16,7h1v1h-1zM17,7h1v1h-1zM18,7h1v1h-1zM19,7h1v1h-1zM23,7h1v1h-1zM24,7h1v1h-1zM26,7h1v1h-1zM28,7h1v1h-1zM34,7h1v1h-1zM2,8h1v1h-1zM3,8h1v1h-1zM4,8h1v1h-1zM5,8h1v1h-1zM6,8h1v1h-1zM7,8h1v1h-1zM8,8h1v1h-1zM10,8h1v1h-1zM12,8h1v1h-1zM14,8h1v1h-1zM16,8h1v1h-1zM18,8h1v1h-1zM20,8h1v1h-1zM22,8h1v1h-1zM24,8h1v1h-1zM26,8h1v1h-1zM28,8h1v1h-1zM29,8h1v1h-1zM30,8h1v1h-1zM31,8h1v1h-1zM32,8h1v1h-1zM33,8h1v1h-1zM34,8h1v1h-1zM11,9h1v1h-1zM13,9h1v1h-1zM17,9h1v1h-1zM18,9h1v1h-1zM19,9h1v1h-1zM21,9h1v1h-1zM25,9h1v1h-1zM26,9h1v1h-1zM3,10h1v1h-1zM4,10h1v1h-1zM5,10h1v1h-1zM7,10h1v1h-1zM8,10h1v1h-1zM12,10h1v1h-1zM15,10h1v1h-1zM16,10h1v1h-1zM19,10h1v1h-1zM20,10h1v1h-1zM23,10h1v1h-1zM25,10h1v1h-1zM26,10h1v1h-1zM32,10h1v1h-1zM33,10h1v1h-1zM4,11h1v1h-1zM7,11h1v1h-1zM9,11h1v1h-1zM10,11h1v1h-1zM12,11h1v1h-1zM17,11h1v1h-1zM18,11h1v1h-1zM19,11h1v1h-1zM20,11h1v1h-1zM21,11h1v1h-1zM22,11h1v1h-1zM25,11h1v1h-1zM28,11h1v1h-1zM29,11h1v1h-1zM31,11h1v1h-1zM32,11h1v1h-1zM34,11h1v1h-1zM2,12h1v1h-1zM3,12h1v1h-1zM6,12h1v1h-1zM8,12h1v1h-1zM10,12h1v1h-1zM13,12h1v1h-1zM14,12h1v1h-1zM15,12h1v1h-1zM16,12h1v1h-1zM20,12h1v1h-1zM25,12h1v1h-1zM26,12h1v1h-1zM28,12h1v1h-1zM29,12h1v1h-1zM30,12h1v1h-1zM31,12h1v1h-1zM34,12h1v1h-1zM3,13h1v1h-1zM5,13h1v1h-1zM9,13h1v1h-1zM11,13h1v1h-1zM13,13h1v1h-1zM16,13h1v1h-1zM19,13h1v1h-1zM21,13h1v1h-1zM22,13h1v1h-1zM26,13h1v1h-1zM28,13h1v1h-1zM29,13h1v1h-1zM31,13h1v1h-1zM33,13h1v1h-1zM34,13h1v1h-1zM2,14h1v1h-1zM3,14h1v1h-1zM6,14h1v1h-1zM8,14h1v1h-1zM10,14h1v1h-1zM11,14h1v1h-1zM12,14h1v1h-1zM14,14h1v1h-1zM15,14h1v1h-1zM18,14h1v1h-1zM21,14h1v1h-1zM24,14h1v1h-1zM25,14h1v1h-1zM26,14h1v1h-1zM27,14h1v1h-1zM30,14h1v1h-1zM31,14h1v1h-1zM33,14h1v1h-1zM34,14h1v1h-1zM6,15h1v1h-1zM7,15h1v1h-1zM13,15h1v1h-1zM14,15h1v1h-1zM15,15h1v1h-1zM16,15h1v1h-1zM17,15h1v1h-1zM19,15h1v1h-1zM22,15h1v1h-1zM23,15h1v1h-1zM24,15h1v1h-1zM26,15h1v1h-1zM27,15h1v1h-1zM29,15h1v1h-1zM32,15h1v1h-1zM33,15h1v1h-1zM2,16h1v1h-1zM3,16h1v1h-1zM4,16h1v1h-1zM5,16h1v1h-1zM6,16h1v1h-1zM7,16h1v1h-1zM8,16h1v1h-1zM9,16h1v1h-1zM17,16h1v1h-1zM20,16h1v1h-1zM21,16h1v1h-1zM23,16h1v1h-1zM26,16h1v1h-1zM28,16h1v1h-1zM31,16h1v1h-1zM4,17h1v1h-1zM9,17h1v1h-1zM11,17h1v1h-1zM14,17h1v1h-1zM15,17h1v1h-1zM17,17h1v1h-1zM18,17h1v1h-1zM23,17h1v1h-1zM24,17h1v1h-1zM26,17h1v1h-1zM27,17h1v1h-1zM28,17h1v1h-1zM30,17h1v1h-1zM31,17h1v1h-1zM32,17h1v1h-1zM2,18h1v1h-1zM3,18h1v1h-1zM6,18h1v1h-1zM8,18h1v1h-1zM10,18h1v1h-1zM14,18h1v1h-1zM18,18h1v1h-1zM19,18h1v1h-1zM22,18h1v1h-1zM23,18h1v1h-1zM24,18h1v1h-1zM25,18h1v1h-1zM27,18h1v1h-1zM28,18h1v1h-1zM30,18h1v1h-1zM32,18h1v1h-1zM4,19h1v1h-1zM6,19h1v1h-1zM18,19h1v1h-1zM19,19h1v1h-1zM24,19h1v1h-1zM25,19h1v1h-1zM27,19h1v1h-1zM28,19h1v1h-1zM30,19h1v1h-1zM31,19h1v1h-1zM33,19h1v1h-1zM34,19h1v1h-1zM2,20h1v1h-1zM4,20h1v1h-1zM8,20h1v1h-1zM9,20h1v1h-1zM10,20h1v1h-1zM11,20h1v1h-1zM15,20h1v1h-1zM17,20h1v1h-1zM19,20h1v1h-1zM20,20h1v1h-1zM23,20h1v1h-1zM24,20h1v1h-1zM27,20h1v1h-1zM29,20h1v1h-1zM30,20h1v1h-1zM32,20h1v1h-1zM33,20h1v1h-1zM3,21h1v1h-1zM4,21h1v1h-1zM5,21h1v1h-1zM11,21h1v1h-1zM12,21h1v1h-1zM13,21h1v1h-1zM15,21h1v1h-1zM16,21h1v1h-1zM17,21h1v1h-1zM19,21h1v1h-1zM25,21h1v1h-1zM28,21h1v1h-1zM30,21h1v1h-1zM33,21h1v1h-1zM34,21h1v1h-1zM4,22h1v1h-1zM5,22h1v1h-1zM8,22h1v1h-1zM11,22h1v1h-1zM14,22h1v1h-1zM16,22h1v1h-1zM17,22h1v1h-1zM18,22h1v1h-1zM21,22h1v1h-1zM22,22h1v1h-1zM23,22h1v1h-1zM24,22h1v1h-1zM31,22h1v1h-1zM32,22h1v1h-1zM33,22h1v1h-1zM34,22h1v1h-1zM2,23h1v1h-1zM3,23h1v1h-1zM5,23h1v1h-1zM6,23h1v1h-1zM7,23h1v1h-1zM9,23h1v1h-1zM11,23h1v1h-1zM12,23h1v1h-1zM13,23h1v1h-1zM15,23h1v1h-1zM16,23h1v1h-1zM17,23h1v1h-1zM18,23h1v1h-1zM19,23h1v1h-1zM21,23h1v1h-1zM22,23h1v1h-1zM25,23h1v1h-1zM27,23h1v1h-1zM28,23h1v1h-1zM29,23h1v1h-1zM32,23h1v1h-1zM34,23h1v1h-1zM5,24h1v1h-1zM7,24h1v1h-1zM8,24h1v1h-1zM9,24h1v1h-1zM12,24h1v1h-1zM14,24h1v1h-1zM16,24h1v1h-1zM17,24h1v1h-1zM18,24h1v1h-1zM20,24h1v1h-1zM22,24h1v1h-1zM23,24h1v1h-1zM25,24h1v1h-1zM26,24h1v1h-1zM27,24h1v1h-1zM28,24h1v1h-1zM31,24h1v1h-1zM32,24h1v1h-1zM33,24h1v1h-1zM34,24h1v1h-1zM3,25h1v1h-1zM5,25h1v1h-1zM7,25h1v1h-1zM9,25h1v1h-1zM10,25h1v1h-1zM14,25h1v1h-1zM15,25h1v1h-1zM16,25h1v1h-1zM17,25h1v1h-1zM18,25h1v1h-1zM19,25h1v1h-1zM21,25h1v1h-1zM24,25h1v1h-1zM26,25h1v1h-1zM29,25h1v1h-1zM30,25h1v1h-1zM31,25h1v1h-1zM34,25h1v1h-1zM2,26h1v1h-1zM4,26h1v1h-1zM5,26h1v1h-1zM8,26h1v1h-1zM9,26h1v1h-1zM13,26h1v1h-1zM16,26h1v1h-1zM17,26h1v1h-1zM18,26h1v1h-1zM20,26h1v1h-1zM22,26h1v1h-1zM24,26h1v1h-1zM26,26h1v1h-1zM27,26h1v1h-1zM28,26h1v1h-1zM29,26h1v1h-1zM30,26h1v1h-1zM34,26h1v1h-1zM10,27h1v1h-1zM11,27h1v1h-1zM14,27h1v1h-1zM17,27h1v1h-1zM18,27h1v1h-1zM20,27h1v1h-1zM21,27h1v1h-1zM23,27h1v1h-1zM25,27h1v1h-1zM26,27h1v1h-1zM30,27h1v1h-1zM31,27h1v1h-1zM2,28h1v1h-1zM3,28h1v1h-1zM4,28h1v1h-1zM5,28h1v1h-1zM6,28h1v1h-1zM7,28h1v1h-1zM8,28h1v1h-1zM11,28h1v1h-1zM14,28h1v1h-1zM15,28h1v1h-1zM17,28h1v1h-1zM20,28h1v1h-1zM21,28h1v1h-1zM22,28h1v1h-1zM23,28h1v1h-1zM25,28h1v1h-1zM26,28h1v1h-1zM28,28h1v1h-1zM30,28h1v1h-1zM2,29h1v1h-1zM8,29h1v1h-1zM10,29h1v1h-1zM11,29h1v1h-1zM17,29h1v1h-1zM18,29h1v1h-1zM19,29h1v1h-1zM21,29h1v1h-1zM23,29h1v1h-1zM25,29h1v1h-1zM26,29h1v1h-1zM30,29h1v1h-1zM31,29h1v1h-1zM32,29h1v1h-1zM33,29h1v1h-1zM2,30h1v1h-1zM4,30h1v1h-1zM5,30h1v1h-1zM6,30h1v1h-1zM8,30h1v1h-1zM14,30h1v1h-1zM15,30h1v1h-1zM16,30h1v1h-1zM19,30h1v1h-1zM20,30h1v1h-1zM23,30h1v1h-1zM24,30h1v1h-1zM25,30h1v1h-1zM26,30h1v1h-1zM27,30h1v1h-1zM28,30h1v1h-1zM29,30h1v1h-1zM30,30h1v1h-1zM32,30h1v1h-1zM34,30h1v1h-1zM2,31h1v1h-1zM4,31h1v1h-1zM5,31h1v1h-1zM6,31h1v1h-1zM8,31h1v1h-1zM10,31h1v1h-1zM12,31h1v1h-1zM15,31h1v1h-1zM19,31h1v1h-1zM22,31h1v1h-1zM24,31h1v1h-1zM29,31h1v1h-1zM31,31h1v1h-1zM32,31h1v1h-1zM33,31h1v1h-1zM34,31h1v1h-1zM2,32h1v1h-1zM4,32h1v1h-1zM5,32h1v1h-1zM6,32h1v1h-1zM8,32h1v1h-1zM10,32h1v1h-1zM11,32h1v1h-1zM14,32h1v1h-1zM19,32h1v1h-1zM20,32h1v1h-1zM22,32h1v1h-1zM23,32h1v1h-1zM24,32h1v1h-1zM25,32h1v1h-1zM26,32h1v1h-1zM28,32h1v1h-1zM29,32h1v1h-1zM31,32h1v1h-1zM2,33h1v1h-1zM8,33h1v1h-1zM10,33h1v1h-1zM14,33h1v1h-1zM15,33h1v1h-1zM17,33h1v1h-1zM18,33h1v1h-1zM22,33h1v1h-1zM24,33h1v1h-1zM25,33h1v1h-1zM26,33h1v1h-1zM28,33h1v1h-1zM29,33h1v1h-1zM30,33h1v1h-1zM34,33h1v1h-1zM2,34h1v1h-1zM3,34h1v1h-1zM4,34h1v1h-1zM5,34h1v1h-1zM6,34h1v1h-1zM7,34h1v1h-1zM8,34h1v1h-1zM11,34h1v1h-1zM13,34h1v1h-1zM14,34h1v1h-1zM17,34h1v1h-1zM20,34h1v1h-1zM21,34h1v1h-1zM23,34h1v1h-1zM25,34h1v1h-1zM27,34h1v1h-1zM28,34h1v1h-1zM30,34h1v1h-1zM31,34h1v1h-1zM32,34h1v1h-1z" fill="#0b0e19"/></svg></a>
+      <div class="qr-text"><span class="topline">Scan to try the app</span><strong>Play the memory game and explore the data yourself</strong><span class="small">eda-project-brain-rot.streamlit.app</span>
+        <a class="btn primary" href="https://eda-project-brain-rot.streamlit.app" target="_blank" rel="noopener noreferrer">Open the Streamlit app ↗</a></div>
+    </div>
+    <div class="prepared rv" style="--i:6"><span class="av">F</span><span>Prepared by <strong>Fay Altheeb</strong></span></div>
+    <div class="source-links rv" style="--i:7;justify-content:center;margin-top:18px">
+      <a href="https://doi.org/10.1145/3544548.3580778" rel="noopener noreferrer" target="_blank">Research paper ↗</a>
+      <a href="https://darus.uni-stuttgart.de/dataset.xhtml?persistentId=doi:10.18419/DARUS-3327" rel="noopener noreferrer" target="_blank">Original dataset ↗</a>
+      <a href="https://github.com/mimuc/media-prospective-memory" rel="noopener noreferrer" target="_blank">Research code ↗</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="page-counter"><span id="pageCurrent">01</span> / <span id="pageTotal">13</span></div>
+  <div class="footer-hint">← → navigate · G slides · N notes · F fullscreen</div>
+  <div class="tools"><button aria-label="Previous slide" class="icon-btn nav-btn" id="prevButton"><svg class="ar" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span class="label">Back</span></button><button aria-label="Next slide" class="icon-btn nav-btn primary" id="nextButton"><span class="label">Next</span><svg class="ar" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
+</footer>
+<div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+<div class="tooltip" id="tooltip"></div>
+<div class="toast" id="toast" role="status"></div>
+<div aria-modal="true" class="modal" id="overviewModal" role="dialog"><div class="modal-panel"><div class="modal-head"><h3>Jump to a slide</h3><button aria-label="Close" class="icon-btn close-modal">×</button></div><div class="overview-grid" id="overviewGrid"></div></div></div>
+<div aria-modal="true" class="modal" id="notesModal" role="dialog"><div class="modal-panel" style="width:min(760px,100%)"><div class="modal-head"><h3>Presenter notes</h3><button aria-label="Close" class="icon-btn close-modal">×</button></div><div class="notes-body" id="notesBody"></div></div></div>
+
+<script>
+'use strict';
+const DATA={"stats":{"rows":21479,"participants":60,"missingRT":102,"groups":4,"LD":19698,"PM":1781,"medianRT":0.739},"phase":[{"group":"rest","task":"LD","phase":"post","accuracy":97.906},{"group":"rest","task":"LD","phase":"pre","accuracy":97.638},{"group":"rest","task":"PM","phase":"post","accuracy":90.977},{"group":"rest","task":"PM","phase":"pre","accuracy":84.466},{"group":"tiktok","task":"LD","phase":"post","accuracy":97.959},{"group":"tiktok","task":"LD","phase":"pre","accuracy":97.714},{"group":"tiktok","task":"PM","phase":"post","accuracy":46.574},{"group":"tiktok","task":"PM","phase":"pre","accuracy":77.803},{"group":"twitter","task":"LD","phase":"post","accuracy":97.958},{"group":"twitter","task":"LD","phase":"pre","accuracy":98.875},{"group":"twitter","task":"PM","phase":"post","accuracy":97.175},{"group":"twitter","task":"PM","phase":"pre","accuracy":85.736},{"group":"youtube","task":"LD","phase":"post","accuracy":91.133},{"group":"youtube","task":"LD","phase":"pre","accuracy":91.288},{"group":"youtube","task":"PM","phase":"post","accuracy":78.931},{"group":"youtube","task":"PM","phase":"pre","accuracy":79.825}],"changes":[{"group":"rest","task":"LD","delta":0.268},{"group":"rest","task":"PM","delta":6.511},{"group":"tiktok","task":"LD","delta":0.246},{"group":"tiktok","task":"PM","delta":-31.229},{"group":"twitter","task":"LD","delta":-0.917},{"group":"twitter","task":"PM","delta":11.438},{"group":"youtube","task":"LD","delta":-0.155},{"group":"youtube","task":"PM","delta":-0.894}],"individuals":[{"id":"101","group":"rest","task":"LD","pre":96.855,"post":99.375,"delta":2.52},{"id":"101","group":"rest","task":"PM","pre":86.667,"post":100.0,"delta":13.333},{"id":"102","group":"rest","task":"LD","pre":92.727,"post":96.875,"delta":4.148},{"id":"102","group":"rest","task":"PM","pre":77.778,"post":100.0,"delta":22.222},{"id":"103","group":"rest","task":"LD","pre":98.75,"post":98.75,"delta":0.0},{"id":"103","group":"rest","task":"PM","pre":92.857,"post":100.0,"delta":7.143},{"id":"104","group":"rest","task":"LD","pre":99.375,"post":100.0,"delta":0.625},{"id":"104","group":"rest","task":"PM","pre":92.857,"post":100.0,"delta":7.143},{"id":"105","group":"rest","task":"LD","pre":98.75,"post":99.375,"delta":0.625},{"id":"105","group":"rest","task":"PM","pre":92.857,"post":100.0,"delta":7.143},{"id":"106","group":"rest","task":"LD","pre":97.5,"post":99.371,"delta":1.871},{"id":"106","group":"rest","task":"PM","pre":92.857,"post":86.667,"delta":-6.19},{"id":"107","group":"rest","task":"LD","pre":99.379,"post":98.125,"delta":-1.254},{"id":"107","group":"rest","task":"PM","pre":84.615,"post":100.0,"delta":15.385},{"id":"108","group":"rest","task":"LD","pre":98.75,"post":98.75,"delta":0.0},{"id":"108","group":"rest","task":"PM","pre":92.857,"post":100.0,"delta":7.143},{"id":"109","group":"rest","task":"LD","pre":96.273,"post":96.855,"delta":0.582},{"id":"109","group":"rest","task":"PM","pre":92.308,"post":93.333,"delta":1.026},{"id":"110","group":"rest","task":"LD","pre":95.57,"post":96.273,"delta":0.704},{"id":"110","group":"rest","task":"PM","pre":62.5,"post":83.333,"delta":20.833},{"id":"111","group":"rest","task":"LD","pre":99.367,"post":100.0,"delta":0.633},{"id":"111","group":"rest","task":"PM","pre":81.25,"post":100.0,"delta":18.75},{"id":"112","group":"rest","task":"LD","pre":98.75,"post":97.5,"delta":-1.25},{"id":"112","group":"rest","task":"PM","pre":92.857,"post":92.857,"delta":0.0},{"id":"113","group":"rest","task":"LD","pre":99.375,"post":97.5,"delta":-1.875},{"id":"113","group":"rest","task":"PM","pre":92.857,"post":100.0,"delta":7.143},{"id":"114","group":"rest","task":"LD","pre":96.894,"post":95.031,"delta":-1.863},{"id":"114","group":"rest","task":"PM","pre":46.154,"post":38.462,"delta":-7.692},{"id":"115","group":"rest","task":"LD","pre":96.25,"post":94.805,"delta":-1.445},{"id":"115","group":"rest","task":"PM","pre":85.714,"post":70.0,"delta":-15.714},{"id":"201","group":"tiktok","task":"LD","pre":99.375,"post":98.742,"delta":-0.633},{"id":"201","group":"tiktok","task":"PM","pre":85.714,"post":40.0,"delta":-45.714},{"id":"202","group":"tiktok","task":"LD","pre":96.875,"post":98.75,"delta":1.875},{"id":"202","group":"tiktok","task":"PM","pre":71.429,"post":71.429,"delta":0.0},{"id":"203","group":"tiktok","task":"LD","pre":99.375,"post":98.125,"delta":-1.25},{"id":"203","group":"tiktok","task":"PM","pre":92.857,"post":50.0,"delta":-42.857},{"id":"204","group":"tiktok","task":"LD","pre":99.363,"post":97.5,"delta":-1.863},{"id":"204","group":"tiktok","task":"PM","pre":76.471,"post":64.286,"delta":-12.185},{"id":"205","group":"tiktok","task":"LD","pre":99.375,"post":97.5,"delta":-1.875},{"id":"205","group":"tiktok","task":"PM","pre":92.857,"post":50.0,"delta":-42.857},{"id":"206","group":"tiktok","task":"LD","pre":98.101,"post":98.75,"delta":0.649},{"id":"206","group":"tiktok","task":"PM","pre":31.25,"post":28.571,"delta":-2.679},{"id":"207","group":"tiktok","task":"LD","pre":99.375,"post":99.375,"delta":0.0},{"id":"207","group":"tiktok","task":"PM","pre":92.857,"post":64.286,"delta":-28.571},{"id":"208","group":"tiktok","task":"LD","pre":94.444,"post":96.875,"delta":2.431},{"id":"208","group":"tiktok","task":"PM","pre":91.667,"post":57.143,"delta":-34.524},{"id":"209","group":"tiktok","task":"LD","pre":98.75,"post":99.375,"delta":0.625},{"id":"209","group":"tiktok","task":"PM","pre":92.857,"post":28.571,"delta":-64.286},{"id":"210","group":"tiktok","task":"LD","pre":98.75,"post":100.0,"delta":1.25},{"id":"210","group":"tiktok","task":"PM","pre":92.857,"post":28.571,"delta":-64.286},{"id":"211","group":"tiktok","task":"LD","pre":91.925,"post":91.358,"delta":-0.567},{"id":"211","group":"tiktok","task":"PM","pre":76.923,"post":25.0,"delta":-51.923},{"id":"212","group":"tiktok","task":"LD","pre":99.375,"post":98.75,"delta":-0.625},{"id":"212","group":"tiktok","task":"PM","pre":85.714,"post":50.0,"delta":-35.714},{"id":"213","group":"tiktok","task":"LD","pre":95.652,"post":98.75,"delta":3.098},{"id":"213","group":"tiktok","task":"PM","pre":76.923,"post":28.571,"delta":-48.352},{"id":"214","group":"tiktok","task":"LD","pre":99.371,"post":100.0,"delta":0.629},{"id":"214","group":"tiktok","task":"PM","pre":33.333,"post":35.714,"delta":2.381},{"id":"215","group":"tiktok","task":"LD","pre":95.597,"post":95.541,"delta":-0.056},{"id":"215","group":"tiktok","task":"PM","pre":73.333,"post":76.471,"delta":3.137},{"id":"301","group":"youtube","task":"LD","pre":95.597,"post":92.857,"delta":-2.74},{"id":"301","group":"youtube","task":"PM","pre":73.333,"post":70.0,"delta":-3.333},{"id":"302","group":"youtube","task":"LD","pre":98.137,"post":100.0,"delta":1.863},{"id":"302","group":"youtube","task":"PM","pre":69.231,"post":64.286,"delta":-4.945},{"id":"303","group":"youtube","task":"LD","pre":95.0,"post":96.25,"delta":1.25},{"id":"303","group":"youtube","task":"PM","pre":78.571,"post":21.429,"delta":-57.143},{"id":"304","group":"youtube","task":"LD","pre":98.125,"post":100.0,"delta":1.875},{"id":"304","group":"youtube","task":"PM","pre":92.857,"post":100.0,"delta":7.143},{"id":"305","group":"youtube","task":"LD","pre":98.125,"post":94.375,"delta":-3.75},{"id":"305","group":"youtube","task":"PM","pre":92.857,"post":100.0,"delta":7.143},{"id":"306","group":"youtube","task":"LD","pre":98.758,"post":99.375,"delta":0.617},{"id":"306","group":"youtube","task":"PM","pre":100.0,"post":100.0,"delta":0.0},{"id":"307","group":"youtube","task":"LD","pre":99.375,"post":98.75,"delta":-0.625},{"id":"307","group":"youtube","task":"PM","pre":92.857,"post":100.0,"delta":7.143},{"id":"308","group":"youtube","task":"LD","pre":97.5,"post":96.875,"delta":-0.625},{"id":"308","group":"youtube","task":"PM","pre":92.857,"post":35.714,"delta":-57.143},{"id":"309","group":"youtube","task":"LD","pre":98.758,"post":96.875,"delta":-1.883},{"id":"309","group":"youtube","task":"PM","pre":92.308,"post":100.0,"delta":7.692},{"id":"310","group":"youtube","task":"LD","pre":1.258,"post":2.484,"delta":1.227},{"id":"310","group":"youtube","task":"PM","pre":80.0,"post":100.0,"delta":20.0},{"id":"311","group":"youtube","task":"LD","pre":98.75,"post":98.75,"delta":0.0},{"id":"311","group":"youtube","task":"PM","pre":92.857,"post":100.0,"delta":7.143},{"id":"312","group":"youtube","task":"LD","pre":99.375,"post":100.0,"delta":0.625},{"id":"312","group":"youtube","task":"PM","pre":92.857,"post":93.333,"delta":0.476},{"id":"313","group":"youtube","task":"LD","pre":98.742,"post":100.0,"delta":1.258},{"id":"313","group":"youtube","task":"PM","pre":20.0,"post":35.714,"delta":15.714},{"id":"314","group":"youtube","task":"LD","pre":95.57,"post":91.026,"delta":-4.544},{"id":"314","group":"youtube","task":"PM","pre":62.5,"post":77.778,"delta":15.278},{"id":"315","group":"youtube","task":"LD","pre":96.25,"post":99.375,"delta":3.125},{"id":"315","group":"youtube","task":"PM","pre":64.286,"post":85.714,"delta":21.429},{"id":"401","group":"twitter","task":"LD","pre":96.25,"post":98.742,"delta":2.492},{"id":"401","group":"twitter","task":"PM","pre":85.714,"post":93.333,"delta":7.619},{"id":"402","group":"twitter","task":"LD","pre":98.75,"post":98.75,"delta":0.0},{"id":"402","group":"twitter","task":"PM","pre":85.714,"post":100.0,"delta":14.286},{"id":"403","group":"twitter","task":"LD","pre":99.375,"post":96.875,"delta":-2.5},{"id":"403","group":"twitter","task":"PM","pre":78.571,"post":100.0,"delta":21.429},{"id":"404","group":"twitter","task":"LD","pre":97.5,"post":96.25,"delta":-1.25},{"id":"404","group":"twitter","task":"PM","pre":92.857,"post":92.857,"delta":0.0},{"id":"405","group":"twitter","task":"LD","pre":99.375,"post":99.375,"delta":0.0},{"id":"405","group":"twitter","task":"PM","pre":92.857,"post":100.0,"delta":7.143},{"id":"406","group":"twitter","task":"LD","pre":99.375,"post":98.125,"delta":-1.25},{"id":"406","group":"twitter","task":"PM","pre":85.714,"post":92.857,"delta":7.143},{"id":"407","group":"twitter","task":"LD","pre":98.75,"post":98.125,"delta":-0.625},{"id":"407","group":"twitter","task":"PM","pre":85.714,"post":92.857,"delta":7.143},{"id":"408","group":"twitter","task":"LD","pre":99.375,"post":98.75,"delta":-0.625},{"id":"408","group":"twitter","task":"PM","pre":92.857,"post":100.0,"delta":7.143},{"id":"409","group":"twitter","task":"LD","pre":99.371,"post":96.875,"delta":-2.496},{"id":"409","group":"twitter","task":"PM","pre":80.0,"post":100.0,"delta":20.0},{"id":"410","group":"twitter","task":"LD","pre":98.75,"post":100.0,"delta":1.25},{"id":"410","group":"twitter","task":"PM","pre":92.857,"post":100.0,"delta":7.143},{"id":"411","group":"twitter","task":"LD","pre":99.379,"post":97.5,"delta":-1.879},{"id":"411","group":"twitter","task":"PM","pre":84.615,"post":92.857,"delta":8.242},{"id":"412","group":"twitter","task":"LD","pre":100.0,"post":96.875,"delta":-3.125},{"id":"412","group":"twitter","task":"PM","pre":78.571,"post":100.0,"delta":21.429},{"id":"413","group":"twitter","task":"LD","pre":100.0,"post":96.875,"delta":-3.125},{"id":"413","group":"twitter","task":"PM","pre":78.571,"post":100.0,"delta":21.429},{"id":"414","group":"twitter","task":"LD","pre":98.125,"post":97.5,"delta":-0.625},{"id":"414","group":"twitter","task":"PM","pre":92.857,"post":100.0,"delta":7.143},{"id":"415","group":"twitter","task":"LD","pre":98.75,"post":98.75,"delta":0.0},{"id":"415","group":"twitter","task":"PM","pre":78.571,"post":92.857,"delta":14.286}],"speedPoints":[{"id":"101","task":"LD","rt":0.617,"accuracy":98.119},{"id":"101","task":"PM","rt":1.1667,"accuracy":93.103},{"id":"102","task":"LD","rt":0.7222,"accuracy":94.769},{"id":"102","task":"PM","rt":1.2058,"accuracy":91.304},{"id":"103","task":"LD","rt":0.6781,"accuracy":98.75},{"id":"103","task":"PM","rt":1.0715,"accuracy":96.429},{"id":"104","task":"LD","rt":0.6637,"accuracy":99.688},{"id":"104","task":"PM","rt":1.0543,"accuracy":96.429},{"id":"105","task":"LD","rt":0.7568,"accuracy":99.062},{"id":"105","task":"PM","rt":1.2879,"accuracy":96.429},{"id":"106","task":"LD","rt":0.8239,"accuracy":98.433},{"id":"106","task":"PM","rt":1.0904,"accuracy":89.655},{"id":"107","task":"LD","rt":0.7091,"accuracy":98.754},{"id":"107","task":"PM","rt":1.4571,"accuracy":92.593},{"id":"108","task":"LD","rt":0.7643,"accuracy":98.75},{"id":"108","task":"PM","rt":1.4167,"accuracy":96.429},{"id":"109","task":"LD","rt":0.8643,"accuracy":96.562},{"id":"109","task":"PM","rt":1.2381,"accuracy":92.857},{"id":"110","task":"LD","rt":1.0532,"accuracy":95.925},{"id":"110","task":"PM","rt":1.7029,"accuracy":71.429},{"id":"111","task":"LD","rt":0.8188,"accuracy":99.686},{"id":"111","task":"PM","rt":1.2154,"accuracy":90.0},{"id":"112","task":"LD","rt":0.6684,"accuracy":98.125},{"id":"112","task":"PM","rt":1.0956,"accuracy":92.857},{"id":"113","task":"LD","rt":0.743,"accuracy":98.438},{"id":"113","task":"PM","rt":1.309,"accuracy":96.429},{"id":"114","task":"LD","rt":0.7085,"accuracy":95.963},{"id":"114","task":"PM","rt":1.1082,"accuracy":42.308},{"id":"115","task":"LD","rt":1.2106,"accuracy":95.541},{"id":"115","task":"PM","rt":1.4406,"accuracy":76.471},{"id":"201","task":"LD","rt":0.6205,"accuracy":99.06},{"id":"201","task":"PM","rt":0.9,"accuracy":62.069},{"id":"202","task":"LD","rt":0.7937,"accuracy":97.812},{"id":"202","task":"PM","rt":1.0583,"accuracy":71.429},{"id":"203","task":"LD","rt":0.8671,"accuracy":98.75},{"id":"203","task":"PM","rt":1.2068,"accuracy":71.429},{"id":"204","task":"LD","rt":1.2578,"accuracy":98.423},{"id":"204","task":"PM","rt":1.4722,"accuracy":70.968},{"id":"205","task":"LD","rt":0.7544,"accuracy":98.438},{"id":"205","task":"PM","rt":1.1255,"accuracy":71.429},{"id":"206","task":"LD","rt":0.8198,"accuracy":98.428},{"id":"206","task":"PM","rt":1.0802,"accuracy":30.0},{"id":"207","task":"LD","rt":1.0283,"accuracy":99.375},{"id":"207","task":"PM","rt":1.3537,"accuracy":78.571},{"id":"208","task":"LD","rt":0.6198,"accuracy":95.652},{"id":"208","task":"PM","rt":0.9274,"accuracy":73.077},{"id":"209","task":"LD","rt":0.7774,"accuracy":99.062},{"id":"209","task":"PM","rt":1.1132,"accuracy":60.714},{"id":"210","task":"LD","rt":0.9376,"accuracy":99.375},{"id":"210","task":"PM","rt":1.5611,"accuracy":60.714},{"id":"211","task":"LD","rt":0.9075,"accuracy":91.641},{"id":"211","task":"PM","rt":1.4834,"accuracy":52.0},{"id":"212","task":"LD","rt":0.7199,"accuracy":99.062},{"id":"212","task":"PM","rt":1.1908,"accuracy":67.857},{"id":"213","task":"LD","rt":0.9593,"accuracy":97.196},{"id":"213","task":"PM","rt":1.3187,"accuracy":51.852},{"id":"214","task":"LD","rt":0.7959,"accuracy":99.687},{"id":"214","task":"PM","rt":1.267,"accuracy":34.483},{"id":"215","task":"LD","rt":1.0387,"accuracy":95.57},{"id":"215","task":"PM","rt":1.2563,"accuracy":75.0},{"id":"301","task":"LD","rt":1.3988,"accuracy":94.249},{"id":"301","task":"PM","rt":1.2002,"accuracy":71.429},{"id":"302","task":"LD","rt":0.9424,"accuracy":99.065},{"id":"302","task":"PM","rt":1.4208,"accuracy":66.667},{"id":"303","task":"LD","rt":0.9808,"accuracy":95.625},{"id":"303","task":"PM","rt":1.802,"accuracy":50.0},{"id":"304","task":"LD","rt":0.6939,"accuracy":99.062},{"id":"304","task":"PM","rt":1.0282,"accuracy":96.429},{"id":"305","task":"LD","rt":0.8773,"accuracy":96.25},{"id":"305","task":"PM","rt":1.1285,"accuracy":96.429},{"id":"306","task":"LD","rt":0.6952,"accuracy":99.065},{"id":"306","task":"PM","rt":0.9802,"accuracy":100.0},{"id":"307","task":"LD","rt":0.6931,"accuracy":99.062},{"id":"307","task":"PM","rt":1.1344,"accuracy":96.429},{"id":"308","task":"LD","rt":1.013,"accuracy":97.188},{"id":"308","task":"PM","rt":1.1916,"accuracy":64.286},{"id":"309","task":"LD","rt":0.5894,"accuracy":97.819},{"id":"309","task":"PM","rt":0.8992,"accuracy":96.296},{"id":"310","task":"LD","rt":0.6093,"accuracy":1.875},{"id":"310","task":"PM","rt":0.8831,"accuracy":89.286},{"id":"311","task":"LD","rt":0.8964,"accuracy":98.75},{"id":"311","task":"PM","rt":1.2923,"accuracy":96.429},{"id":"312","task":"LD","rt":0.8168,"accuracy":99.687},{"id":"312","task":"PM","rt":1.4527,"accuracy":93.103},{"id":"313","task":"LD","rt":1.407,"accuracy":99.373},{"id":"313","task":"PM","rt":1.4529,"accuracy":27.586},{"id":"314","task":"LD","rt":1.0725,"accuracy":93.312},{"id":"314","task":"PM","rt":1.2919,"accuracy":70.588},{"id":"315","task":"LD","rt":0.8742,"accuracy":97.812},{"id":"315","task":"PM","rt":1.1239,"accuracy":75.0},{"id":"401","task":"LD","rt":0.8307,"accuracy":97.492},{"id":"401","task":"PM","rt":1.3175,"accuracy":89.655},{"id":"402","task":"LD","rt":0.7228,"accuracy":98.75},{"id":"402","task":"PM","rt":1.0972,"accuracy":92.857},{"id":"403","task":"LD","rt":0.7522,"accuracy":98.125},{"id":"403","task":"PM","rt":1.2473,"accuracy":89.286},{"id":"404","task":"LD","rt":0.921,"accuracy":96.875},{"id":"404","task":"PM","rt":1.495,"accuracy":92.857},{"id":"405","task":"LD","rt":0.6808,"accuracy":99.375},{"id":"405","task":"PM","rt":0.9993,"accuracy":96.429},{"id":"406","task":"LD","rt":0.6458,"accuracy":98.75},{"id":"406","task":"PM","rt":1.0372,"accuracy":89.286},{"id":"407","task":"LD","rt":0.6971,"accuracy":98.438},{"id":"407","task":"PM","rt":1.3698,"accuracy":89.286},{"id":"408","task":"LD","rt":0.6993,"accuracy":99.062},{"id":"408","task":"PM","rt":1.2402,"accuracy":96.429},{"id":"409","task":"LD","rt":0.8885,"accuracy":98.119},{"id":"409","task":"PM","rt":1.4279,"accuracy":89.655},{"id":"410","task":"LD","rt":0.7012,"accuracy":99.375},{"id":"410","task":"PM","rt":1.0552,"accuracy":96.429},{"id":"411","task":"LD","rt":0.6911,"accuracy":98.442},{"id":"411","task":"PM","rt":1.1979,"accuracy":88.889},{"id":"412","task":"LD","rt":0.7073,"accuracy":98.438},{"id":"412","task":"PM","rt":1.1339,"accuracy":89.286},{"id":"413","task":"LD","rt":0.7073,"accuracy":98.438},{"id":"413","task":"PM","rt":1.1339,"accuracy":89.286},{"id":"414","task":"LD","rt":0.8111,"accuracy":97.812},{"id":"414","task":"PM","rt":1.2751,"accuracy":96.429},{"id":"415","task":"LD","rt":0.7073,"accuracy":98.75},{"id":"415","task":"PM","rt":1.1339,"accuracy":85.714}],"rtMeans":{"LD":0.823,"PM":1.224},"hist":{"edges":[0.0,0.12,0.24,0.36,0.48,0.6,0.72,0.84,0.96,1.08,1.2,1.32,1.44,1.56,1.68,1.8,1.92,2.04,2.16,2.28,2.4,2.52,2.64,2.76,2.88,3.0],"counts":[4,2,3,214,3541,6209,3752,2232,1417,1028,769,547,428,305,207,192,148,108,69,57,43,40,26,22,14]},"lengths":{"4":5519,"5":5040,"6":4920,"7":3060,"8":2940}};
+DATA.rtPhase={rest:{pre:1.276,post:1.238},tiktok:{pre:1.255,post:1.186},twitter:{pre:1.227,post:1.195},youtube:{pre:1.296,post:1.142}};
+const LIVE_APP_URL='';
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const slides=$$('.slide'), deck=$('#deck');
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const order=['rest','tiktok','twitter','youtube'];
+const LBL={rest:'Rest',tiktok:'TikTok',twitter:'Twitter / X',youtube:'YouTube'};
+const COL={rest:'#70e5d3',tiktok:'#b5a0ff',twitter:'#8eb6ff',youtube:'#ffcd94'};
+const NS='http://www.w3.org/2000/svg';
+let current=0; const visited=new Set();
+
+/* ---------- utilities ---------- */
+const safe=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function notify(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(notify.t);notify.t=setTimeout(()=>t.classList.remove('show'),2400)}
+function el(svg,tag,a={},txt){const o=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(a))o.setAttribute(k,String(v));if(txt!==undefined)o.textContent=txt;svg.append(o);return o}
+function mk(id,w,h){const holder=document.getElementById(id);holder.innerHTML='';const s=document.createElementNS(NS,'svg');s.setAttribute('viewBox',`0 0 ${w} ${h}`);s.setAttribute('preserveAspectRatio','xMidYMid meet');holder.append(s);return s}
+const line=(s,x1,y1,x2,y2,c='#2c3952',w=1,d)=>el(s,'line',{x1,y1,x2,y2,stroke:c,'stroke-width':w,...(d?{'stroke-dasharray':d}:{})});
+const txt=(s,x,y,t,sz=12,c='#aeb9d4',an='start',wt=500,extra={})=>el(s,'text',{x,y,fill:c,'font-size':sz,'font-weight':wt,'text-anchor':an,...extra},t);
+function anim(node,cls,delay=0,style=''){node.setAttribute('class',cls);node.setAttribute('style',`animation-delay:${delay}ms;${style}`);return node}
+function tip(e,m){const t=$('#tooltip');t.innerHTML=m;t.style.display='block';let x=e.clientX+14,y=e.clientY-8;if(x+t.offsetWidth>innerWidth-12)x=e.clientX-t.offsetWidth-14;if(y+t.offsetHeight>innerHeight-12)y=e.clientY-t.offsetHeight-14;t.style.left=Math.max(8,x)+'px';t.style.top=Math.max(8,y)+'px'}
+const hideTip=()=>$('#tooltip').style.display='none';
+function hover(n,m){n.setAttribute('data-hit','');n.addEventListener('mousemove',e=>{if(e.movementX||e.movementY||$('#tooltip').style.display==='block')tip(e,m)});n.addEventListener('mouseleave',hideTip)}
+function countUp(node){const end=+node.dataset.count;if(reduce){node.textContent=end.toLocaleString('en-US');return}const t0=performance.now(),dur=1300;(function f(t){const p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,3);node.textContent=Math.round(end*e).toLocaleString('en-US');if(p<1)requestAnimationFrame(f)})(t0)}
+
+/* ---------- confetti ---------- */
+const fx=$('#fx'),ctx=fx.getContext('2d');let parts=[],fxOn=false;
+function sizeFx(){fx.width=innerWidth*devicePixelRatio;fx.height=innerHeight*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}sizeFx();addEventListener('resize',sizeFx);
+function confetti(x=innerWidth/2,y=innerHeight/3,n=120){if(reduce)return;const cs=['#b5a0ff','#70e5d3','#ffcd94','#8eb6ff','#ff9fbd'];for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,v=4+Math.random()*9;parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-5,r:4+Math.random()*5,c:cs[i%cs.length],rot:Math.random()*6,vr:(Math.random()-.5)*.4,life:0})}if(!fxOn){fxOn=true;requestAnimationFrame(tick)}}
+function tick(){ctx.clearRect(0,0,innerWidth,innerHeight);parts=parts.filter(p=>p.life<140&&p.y<innerHeight+30);parts.forEach(p=>{p.life++;p.vy+=.28;p.vx*=.985;p.x+=p.vx;p.y+=p.vy;p.rot+=p.vr;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.globalAlpha=Math.max(0,1-p.life/140);ctx.fillStyle=p.c;ctx.fillRect(-p.r/2,-p.r/4,p.r,p.r/2);ctx.restore()});if(parts.length)requestAnimationFrame(tick);else{fxOn=false;ctx.clearRect(0,0,innerWidth,innerHeight)}}
+function floaty(e,t,c){const f=document.createElement('div');f.className='floaty';f.textContent=t;f.style.color=c||'#fff';f.style.left=(e.clientX-12)+'px';f.style.top=(e.clientY-20)+'px';document.body.append(f);setTimeout(()=>f.remove(),1000)}
+
+/* ---------- navigation ---------- */
+const enter={};
+function go(i){
+  i=Math.max(0,Math.min(i,slides.length-1));
+  deck.classList.toggle('back',i<current);
+  current=i;visited.add(i);stopGame();hideTip();$$('svg .fade').forEach(n=>n.classList.remove('fade'));
+  slides.forEach((s,k)=>{s.classList.toggle('active',k===i);s.setAttribute('aria-hidden',k===i?'false':'true')});
+  $('#pageCurrent').textContent=String(i+1).padStart(2,'0');$('#pageTotal').textContent=String(slides.length).padStart(2,'0');
+  $('#progressFill').style.width=((i+1)/slides.length*100)+'%';
+  $('#prevButton').disabled=i===0;$('#nextButton').disabled=i===slides.length-1;
+  history.replaceState(null,'','#slide-'+(i+1));scrollTo(0,0);
+  updateQ();
+  slides[i].querySelectorAll('[data-count]').forEach(n=>{n.textContent='0';setTimeout(()=>countUp(n),reduce?0:500+(+(n.closest('.pillar')?.style.getPropertyValue('--i')||0))*150)});
+  enter[i]?.();
+}
+function updateQ(){
+  const qs=k=>(slides[k].dataset.q||'').split(',').filter(Boolean);
+  const now=current>=10?[]:qs(current);const done=new Set();
+  visited.forEach(k=>{if(k<current||k===10&&current===10)qs(k).forEach(q=>done.add(q))});
+  $$('.qchip').forEach(c=>{const q=c.dataset.q;c.classList.toggle('on',now.includes(q));c.classList.toggle('done',done.has(q)&&!now.includes(q))});
+}
+$('#nextButton').onclick=()=>go(current+1);$('#prevButton').onclick=()=>go(current-1);
+function openModal(w){$('#'+w+'Modal').classList.add('show');if(w==='notes')$('#notesBody').innerHTML='<strong>Slide '+String(current+1).padStart(2,'0')+' — '+safe(slides[current].dataset.title)+'</strong><p>'+safe(slides[current].dataset.note)+'</p><p style="color:#939db7;font-size:13px">Press N or Esc to close.</p>'}
+const closeModals=()=>$$('.modal').forEach(x=>x.classList.remove('show'));
+const hasModal=()=>$$('.modal').some(x=>x.classList.contains('show'));
+function toggleFull(){if(!document.fullscreenElement)document.documentElement.requestFullscreen?.().catch(()=>notify('Fullscreen unavailable'));else document.exitFullscreen?.()}
+$('#gridButton').onclick=()=>openModal('overview');$('#notesButton').onclick=()=>openModal('notes');$('#fullscreenButton').onclick=toggleFull;
+$$('.close-modal').forEach(x=>x.onclick=closeModals);$$('.modal').forEach(x=>x.addEventListener('click',e=>{if(e.target===x)closeModals()}));
+$('#overviewGrid').innerHTML=slides.map((s,i)=>`<button class="slide-pick" data-s="${i}"><small>${String(i+1).padStart(2,'0')} / SLIDE</small><strong>${safe(s.dataset.title)}</strong></button>`).join('');
+$$('.slide-pick').forEach(x=>x.onclick=()=>{closeModals();go(+x.dataset.s)});
+addEventListener('keydown',e=>{const k=e.key;if(k==='Escape'){closeModals();return}if(hasModal())return;
+  if(['ArrowRight','ArrowDown',' ','PageDown'].includes(k)){e.preventDefault();go(current+1)}
+  else if(['ArrowLeft','ArrowUp','PageUp'].includes(k)){e.preventDefault();go(current-1)}
+  else if(k==='Home')go(0);else if(k==='End')go(slides.length-1);
+  else if(k.toLowerCase()==='g')openModal('overview');else if(k.toLowerCase()==='n')openModal('notes');else if(k.toLowerCase()==='f')toggleFull()});
+let tx=null;addEventListener('touchstart',e=>{tx=e.touches[0].clientX},{passive:true});addEventListener('touchend',e=>{if(tx===null)return;const dx=e.changedTouches[0].clientX-tx;if(Math.abs(dx)>70&&!e.target.closest('.chart'))go(current+(dx<0?1:-1));tx=null});
+
+/* ---------- 01 cover phone ---------- */
+(()=>{const words=[['CLOUD','real word?'],['BRINTEL','made-up?'],['TIGER','★ remember!'],['GARDEN','real word?'],['PLOSKAR','made-up?']];let k=0;setInterval(()=>{if(current!==0)return;k=(k+1)%words.length;const w=$('#phoneWord');w.textContent=words[k][0];w.classList.toggle('cue',words[k][0]==='TIGER');$('#phoneSub').textContent=words[k][1]},1500)})();
+
+/* ---------- 02 poll ---------- */
+const votes={tiktok:0,youtube:0,twitter:0,rest:0};
+function drawPoll(){const tot=Object.values(votes).reduce((a,b)=>a+b,0),mx=Math.max(...Object.values(votes));$$('.opt').forEach(o=>{const v=votes[o.dataset.opt];o.querySelector('.count').textContent=v;o.classList.toggle('voted',v>0);o.classList.toggle('top',v>0&&v===mx&&tot>1);o.querySelector('.fill').style.width=tot?(v/tot*100)+'%':'0'})}
+$$('.opt').forEach(o=>o.addEventListener('click',e=>{votes[o.dataset.opt]++;drawPoll();floaty(e,'+1',o.querySelector('.ico').style.color)}));
+$('#pollReset').onclick=()=>{order.forEach(g=>votes[g]=0);drawPoll()};
+
+/* ---------- 04 mini game ---------- */
+const TRIALS=[['GARDEN','real'],['BRINTEL','fake'],['CLOUD','real'],['TIGER','star'],['PLOSKAR','fake'],['WINDOW','real'],['MIRVEL','fake'],['RABBIT','star'],['PLANET','real'],['TOMAVE','fake']];
+let gIdx=-1,gTimer=null,gLD=[0,0],gPM=[0,0],gBusy=false;const TLIM=1900;
+function stopGame(){clearTimeout(gTimer);gIdx=-1;gBusy=false;$('#gStart').style.display='';}
+function startGame(){gLD=[0,0];gPM=[0,0];gIdx=-1;$('#gStart').style.display='none';score();nextTrial()}
+function score(){$('#gLD').textContent=gLD[0]+'/'+gLD[1];$('#gPM').textContent=gPM[0]+'/'+gPM[1]}
+function nextTrial(){gIdx++;const st=$('#stage');st.classList.remove('good','bad');
+  if(gIdx>=TRIALS.length){gIdx=-1;const w=$('#gWord');w.className='word show';w.style.fontSize='18px';w.style.letterSpacing='0';
+    w.innerHTML=gPM[0]===gPM[1]?'Perfect: you remembered every animal':`You forgot ${gPM[1]-gPM[0]} of ${gPM[1]} animals`;
+    $('#gTimer').style.transition='none';$('#gTimer').style.width='0';$('#gStart').style.display='';$('#gStart').textContent='↻ Play again';
+    if(gPM[0]===gPM[1])confetti(innerWidth*.78,innerHeight*.45,90);return}
+  const [word]=TRIALS[gIdx];const w=$('#gWord');w.style.fontSize='';w.style.letterSpacing='';w.textContent=word;w.className='word';void w.offsetWidth;w.classList.add('show');
+  const t=$('#gTimer');t.style.transition='none';t.style.width='100%';void t.offsetWidth;t.style.transition=`width ${TLIM}ms linear`;t.style.width='0';
+  gBusy=true;gTimer=setTimeout(()=>answer(null),TLIM)}
+function answer(a){if(gIdx<0||!gBusy)return;gBusy=false;clearTimeout(gTimer);const kind=TRIALS[gIdx][1],ok=a===kind;
+  if(kind==='star'){gPM[1]++;if(ok)gPM[0]++}else{gLD[1]++;if(ok)gLD[0]++}score();
+  $('#stage').classList.add(ok?'good':'bad');setTimeout(nextTrial,380)}
+$('#gStart').onclick=startGame;$$('#gActions .btn').forEach(b=>b.onclick=()=>answer(b.dataset.a));
+
+/* ---------- 05 question jumps ---------- */
+$$('.qcard').forEach(c=>c.onclick=()=>go(+c.dataset.jump));
+
+/* ---------- shared chart helpers ---------- */
+const sg=v=>(v>0?'+':'')+v.toFixed(1);
+function rowG(svg,key){const g=el(svg,'g',{'data-key':key});
+  g.addEventListener('mousemove',e=>{if(!e.movementX&&!e.movementY)return;svg.querySelectorAll('[data-key]').forEach(n=>n.classList.toggle('fade',n.dataset.key!==key))});
+  g.addEventListener('mouseleave',()=>svg.querySelectorAll('.fade').forEach(n=>n.classList.remove('fade')));return g}
+function axisTitleY(s,x,y,t){txt(s,x,y,t,12,'#8e9bb6','middle',600,{transform:`rotate(-90 ${x} ${y})`})}
+
+/* ---------- 07 PM dumbbell + guess ---------- */
+let pmRevealed=false;
+function renderPM(play=true){
+  const s=mk('pmChart',680,410),x0=140,x1=640,yTop=62,gap=82,sc=v=>x0+v/100*(x1-x0);
+  [0,25,50,75,100].forEach(v=>{line(s,sc(v),36,sc(v),366,'#27354e');txt(s,sc(v),24,v+'%',12,'#9da8c3','middle')});
+  txt(s,(x0+x1)/2,402,'Prospective-memory accuracy (participant average)',12,'#8e9bb6','middle',600);
+  order.forEach((g,i)=>{const y=yTop+i*gap,pre=DATA.phase.find(x=>x.group===g&&x.task==='PM'&&x.phase==='pre').accuracy,post=DATA.phase.find(x=>x.group===g&&x.task==='PM'&&x.phase==='post').accuracy,dl=post-pre,d=play?i*260:0;
+    const R=rowG(s,g);
+    const hit=el(R,'rect',{x:4,y:y-36,width:672,height:72,rx:14,fill:g==='tiktok'?'#ff9fbd12':'transparent',stroke:g==='tiktok'?'#ff9fbd44':'none'});
+    hover(hit,`<strong>${LBL[g]}</strong><br>Before ${pre.toFixed(1)}% → After ${post.toFixed(1)}%<br>Change <strong>${sg(dl)} pp</strong>`);
+    txt(R,14,y+5,LBL[g],16,'#f4efff','start',780);
+    const len=Math.abs(sc(post)-sc(pre));
+    anim(line(R,sc(pre),y,sc(post),y,COL[g],7),play?'g-draw':'',d+250,`stroke-dasharray:${len};--len:${len}px;stroke-linecap:round;pointer-events:none`);
+    const b=anim(el(R,'circle',{cx:sc(pre),cy:y,r:9,fill:'#8b98b6',stroke:'#182134','stroke-width':2}),play?'g-pop':'',d);
+    hover(b,`${LBL[g]} · BEFORE<br><strong>${pre.toFixed(1)}%</strong>`);
+    const a=anim(el(R,'circle',{cx:sc(post),cy:y,r:11,fill:COL[g],stroke:'#101626','stroke-width':2}),play?'g-slide':'',d+250,`--dx:${sc(pre)-sc(post)}px`);
+    hover(a,`${LBL[g]} · AFTER<br><strong>${post.toFixed(1)}%</strong><br>${sg(dl)} pp`);
+    anim(txt(R,sc(pre),y-17,pre.toFixed(0)+'%',12,'#c0cadb','middle',650,{'pointer-events':'none'}),play?'g-fade':'',d);
+    anim(txt(R,sc(post),y+30,post.toFixed(0)+'% ('+sg(dl)+')',12,COL[g],'middle',850,{'pointer-events':'none'}),play?'g-fade':'',d+1100);
+  });
+}
+function reveal(guess){
+  if(pmRevealed&&guess===undefined)return;pmRevealed=true;$('#guess').classList.add('gone');renderPM(true);
+  const v=$('#verdict');
+  if(guess==='tiktok'){v.textContent='Correct, it was TikTok';v.className='verdict';setTimeout(()=>confetti(innerWidth*.35,innerHeight*.45),1300)}
+  else if(guess){v.textContent='Not quite, it was TikTok';v.className='verdict no'}else v.textContent='';
+  setTimeout(()=>$('#pmPanel').classList.add('shown'),1400);
+}
+$$('#guess [data-g]').forEach(b=>b.onclick=()=>reveal(b.dataset.g));
+$('#replayPM').onclick=()=>{if(pmRevealed)renderPM(true)};
+enter[6]=()=>{if(pmRevealed){renderPM(true);$('#pmPanel').classList.add('shown')}};
+
+/* ---------- 08 change bars ---------- */
+let chgMode='both';
+function renderChanges(play=true){
+  const W=1120,H=400,L=160,R=90,min=-40,max=20,y0=58,row=84,sc=v=>L+(v-min)/(max-min)*(W-L-R);
+  const s=mk('changeChart',W,H);
+  [-40,-30,-20,-10,0,10,20].forEach(v=>{line(s,sc(v),26,sc(v),360,v===0?'#ded4ff':'#2c3952',v===0?2:1,v===0?'6 6':'');txt(s,sc(v),384,(v>0?'+':'')+v,12,'#aebbd6','middle')});
+  txt(s,sc(-20),20,'◀ lower after the break',11,'#ff9fbd','middle',700);txt(s,sc(10),20,'higher after ▶',11,'#70e5d3','middle',700);
+  txt(s,(L+W-R)/2,H-1,'Change in accuracy after the break (percentage points)',12,'#8e9bb6','middle',600);
+  order.forEach((g,i)=>{const y=y0+i*row,R_=rowG(s,g);
+    const ld=DATA.changes.find(p=>p.group===g&&p.task==='LD').delta,pm=DATA.changes.find(p=>p.group===g&&p.task==='PM').delta;
+    const hit=el(R_,'rect',{x:0,y:y-34,width:W,height:66,rx:12,fill:'transparent'});
+    hover(hit,`<strong>${LBL[g]}</strong><br>LD ${sg(ld)} pp<br>PM ${sg(pm)} pp`);
+    txt(R_,14,y+7,LBL[g],16,'#f7f4ff','start',760);
+    [['LD',ld],['PM',pm]].forEach(([t,dv],j)=>{const yy=y-17+j*25,c=t==='LD'?'#b7a2ff':'#70e5d3',dim=chgMode!=='both'&&chgMode!==t;
+      const x=sc(Math.min(0,dv)),xe=sc(Math.max(0,dv));
+      const r=anim(el(R_,'rect',{x,y:yy,width:Math.max(3,xe-x),height:18,rx:4,fill:c}),play?'g-bar':'',i*120+j*60,`transform-origin:${dv<0?'right':'left'} center`);
+      if(dim)r.classList.add('dim');
+      hover(r,`${LBL[g]} · ${t==='LD'?'Lexical Decision':'Prospective Memory'}<br>Change <strong>${sg(dv)} pp</strong>`);
+      const lb=anim(txt(R_,dv<0?sc(dv)-8:sc(dv)+8,yy+14,sg(dv),12,c,dv<0?'end':'start',780,{'pointer-events':'none'}),play?'g-fade':'',i*120+600);if(dim)lb.classList.add('dim')})});
+}
+$$('#chgSeg .btn').forEach(b=>b.onclick=()=>{chgMode=b.dataset.m;$$('#chgSeg .btn').forEach(x=>x.classList.toggle('sel',x===b));renderChanges(false)});
+enter[7]=()=>renderChanges(true);
+
+/* ---------- 09 response-time box plot ---------- */
+DATA.rtPart=[{"id":"101","g":"rest","t":"LD","pre":0.6141,"post":0.6198},{"id":"101","g":"rest","t":"PM","pre":1.2432,"post":1.0903},{"id":"102","g":"rest","t":"LD","pre":0.7318,"post":0.7123},{"id":"102","g":"rest","t":"PM","pre":1.1424,"post":1.242},{"id":"103","g":"rest","t":"LD","pre":0.6732,"post":0.6831},{"id":"103","g":"rest","t":"PM","pre":1.0826,"post":1.0604},{"id":"104","g":"rest","t":"LD","pre":0.6769,"post":0.6505},{"id":"104","g":"rest","t":"PM","pre":1.1239,"post":0.9846},{"id":"105","g":"rest","t":"LD","pre":0.7841,"post":0.7295},{"id":"105","g":"rest","t":"PM","pre":1.4274,"post":1.1485},{"id":"106","g":"rest","t":"LD","pre":0.8197,"post":0.8282},{"id":"106","g":"rest","t":"PM","pre":1.2325,"post":0.9483},{"id":"107","g":"rest","t":"LD","pre":0.6815,"post":0.7368},{"id":"107","g":"rest","t":"PM","pre":1.4973,"post":1.4227},{"id":"108","g":"rest","t":"LD","pre":0.7755,"post":0.753},{"id":"108","g":"rest","t":"PM","pre":1.2685,"post":1.5649},{"id":"109","g":"rest","t":"LD","pre":0.8631,"post":0.8656},{"id":"109","g":"rest","t":"PM","pre":1.1981,"post":1.2752},{"id":"110","g":"rest","t":"LD","pre":1.1546,"post":0.9538},{"id":"110","g":"rest","t":"PM","pre":1.6648,"post":1.741},{"id":"111","g":"rest","t":"LD","pre":0.8532,"post":0.7848},{"id":"111","g":"rest","t":"PM","pre":1.1832,"post":1.2476},{"id":"112","g":"rest","t":"LD","pre":0.6524,"post":0.6844},{"id":"112","g":"rest","t":"PM","pre":1.1391,"post":1.052},{"id":"113","g":"rest","t":"LD","pre":0.7178,"post":0.7682},{"id":"113","g":"rest","t":"PM","pre":1.28,"post":1.3381},{"id":"114","g":"rest","t":"LD","pre":0.7563,"post":0.6608},{"id":"114","g":"rest","t":"PM","pre":1.1249,"post":1.0915},{"id":"115","g":"rest","t":"LD","pre":1.2002,"post":1.2213},{"id":"115","g":"rest","t":"PM","pre":1.5361,"post":1.3588},{"id":"201","g":"tiktok","t":"LD","pre":0.6269,"post":0.6141},{"id":"201","g":"tiktok","t":"PM","pre":0.9326,"post":0.8673},{"id":"202","g":"tiktok","t":"LD","pre":0.7695,"post":0.8179},{"id":"202","g":"tiktok","t":"PM","pre":1.0379,"post":1.0787},{"id":"203","g":"tiktok","t":"LD","pre":0.8935,"post":0.8407},{"id":"203","g":"tiktok","t":"PM","pre":1.2386,"post":1.1726},{"id":"204","g":"tiktok","t":"LD","pre":1.4725,"post":1.0472},{"id":"204","g":"tiktok","t":"PM","pre":1.6172,"post":1.3273},{"id":"205","g":"tiktok","t":"LD","pre":0.79,"post":0.7186},{"id":"205","g":"tiktok","t":"PM","pre":1.249,"post":1.0019},{"id":"206","g":"tiktok","t":"LD","pre":0.8576,"post":0.7824},{"id":"206","g":"tiktok","t":"PM","pre":1.121,"post":1.0393},{"id":"207","g":"tiktok","t":"LD","pre":1.1353,"post":0.9212},{"id":"207","g":"tiktok","t":"PM","pre":1.366,"post":1.3415},{"id":"208","g":"tiktok","t":"LD","pre":0.6147,"post":0.6249},{"id":"208","g":"tiktok","t":"PM","pre":0.938,"post":0.9183},{"id":"209","g":"tiktok","t":"LD","pre":0.7903,"post":0.7644},{"id":"209","g":"tiktok","t":"PM","pre":1.1011,"post":1.1254},{"id":"210","g":"tiktok","t":"LD","pre":0.9158,"post":0.9594},{"id":"210","g":"tiktok","t":"PM","pre":1.6009,"post":1.5213},{"id":"211","g":"tiktok","t":"LD","pre":0.9481,"post":0.8668},{"id":"211","g":"tiktok","t":"PM","pre":1.5606,"post":1.3992},{"id":"212","g":"tiktok","t":"LD","pre":0.7435,"post":0.6962},{"id":"212","g":"tiktok","t":"PM","pre":1.2684,"post":1.1072},{"id":"213","g":"tiktok","t":"LD","pre":0.976,"post":0.9425},{"id":"213","g":"tiktok","t":"PM","pre":1.3956,"post":1.2473},{"id":"214","g":"tiktok","t":"LD","pre":0.8341,"post":0.7578},{"id":"214","g":"tiktok","t":"PM","pre":1.1756,"post":1.3654},{"id":"215","g":"tiktok","t":"LD","pre":1.0779,"post":0.9989},{"id":"215","g":"tiktok","t":"PM","pre":1.2291,"post":1.2835},{"id":"301","g":"youtube","t":"LD","pre":1.4398,"post":1.3564},{"id":"301","g":"youtube","t":"PM","pre":1.3095,"post":1.0987},{"id":"302","g":"youtube","t":"LD","pre":0.8798,"post":1.0054},{"id":"302","g":"youtube","t":"PM","pre":1.2476,"post":1.5693},{"id":"303","g":"youtube","t":"LD","pre":0.9955,"post":0.9662},{"id":"303","g":"youtube","t":"PM","pre":2.0329,"post":1.5876},{"id":"304","g":"youtube","t":"LD","pre":0.7254,"post":0.6624},{"id":"304","g":"youtube","t":"PM","pre":1.0761,"post":0.9803},{"id":"305","g":"youtube","t":"LD","pre":0.8569,"post":0.8976},{"id":"305","g":"youtube","t":"PM","pre":1.2721,"post":0.9848},{"id":"306","g":"youtube","t":"LD","pre":0.7123,"post":0.6779},{"id":"306","g":"youtube","t":"PM","pre":0.983,"post":0.9776},{"id":"307","g":"youtube","t":"LD","pre":0.6947,"post":0.6915},{"id":"307","g":"youtube","t":"PM","pre":1.1972,"post":1.0715},{"id":"308","g":"youtube","t":"LD","pre":1.0845,"post":0.9414},{"id":"308","g":"youtube","t":"PM","pre":1.3675,"post":1.0158},{"id":"309","g":"youtube","t":"LD","pre":0.6028,"post":0.576},{"id":"309","g":"youtube","t":"PM","pre":0.9113,"post":0.8879},{"id":"310","g":"youtube","t":"LD","pre":0.621,"post":0.5979},{"id":"310","g":"youtube","t":"PM","pre":0.9222,"post":0.841},{"id":"311","g":"youtube","t":"LD","pre":0.8631,"post":0.9297},{"id":"311","g":"youtube","t":"PM","pre":1.3816,"post":1.2031},{"id":"312","g":"youtube","t":"LD","pre":0.8819,"post":0.752},{"id":"312","g":"youtube","t":"PM","pre":1.6406,"post":1.2649},{"id":"313","g":"youtube","t":"LD","pre":1.5118,"post":1.3029},{"id":"313","g":"youtube","t":"PM","pre":1.5231,"post":1.3877},{"id":"314","g":"youtube","t":"LD","pre":1.0534,"post":1.0918},{"id":"314","g":"youtube","t":"PM","pre":1.3994,"post":1.1922},{"id":"315","g":"youtube","t":"LD","pre":0.8375,"post":0.9109},{"id":"315","g":"youtube","t":"PM","pre":1.1765,"post":1.0713},{"id":"401","g":"twitter","t":"LD","pre":0.8252,"post":0.8362},{"id":"401","g":"twitter","t":"PM","pre":1.3911,"post":1.2491},{"id":"402","g":"twitter","t":"LD","pre":0.7789,"post":0.6666},{"id":"402","g":"twitter","t":"PM","pre":1.204,"post":0.9905},{"id":"403","g":"twitter","t":"LD","pre":0.7269,"post":0.7774},{"id":"403","g":"twitter","t":"PM","pre":1.2176,"post":1.277},{"id":"404","g":"twitter","t":"LD","pre":0.9286,"post":0.9134},{"id":"404","g":"twitter","t":"PM","pre":1.2732,"post":1.7169},{"id":"405","g":"twitter","t":"LD","pre":0.6808,"post":0.6807},{"id":"405","g":"twitter","t":"PM","pre":1.0846,"post":0.9139},{"id":"406","g":"twitter","t":"LD","pre":0.6689,"post":0.6227},{"id":"406","g":"twitter","t":"PM","pre":1.0669,"post":1.0076},{"id":"407","g":"twitter","t":"LD","pre":0.6999,"post":0.6943},{"id":"407","g":"twitter","t":"PM","pre":1.3649,"post":1.3747},{"id":"408","g":"twitter","t":"LD","pre":0.7459,"post":0.6527},{"id":"408","g":"twitter","t":"PM","pre":1.3798,"post":1.1006},{"id":"409","g":"twitter","t":"LD","pre":0.8635,"post":0.9133},{"id":"409","g":"twitter","t":"PM","pre":1.3155,"post":1.5402},{"id":"410","g":"twitter","t":"LD","pre":0.6889,"post":0.7134},{"id":"410","g":"twitter","t":"PM","pre":1.108,"post":1.0023},{"id":"411","g":"twitter","t":"LD","pre":0.7146,"post":0.6675},{"id":"411","g":"twitter","t":"PM","pre":1.2327,"post":1.1655},{"id":"412","g":"twitter","t":"LD","pre":0.7477,"post":0.667},{"id":"412","g":"twitter","t":"PM","pre":1.1899,"post":1.078},{"id":"413","g":"twitter","t":"LD","pre":0.7477,"post":0.667},{"id":"413","g":"twitter","t":"PM","pre":1.1899,"post":1.078},{"id":"414","g":"twitter","t":"LD","pre":0.8088,"post":0.8134},{"id":"414","g":"twitter","t":"PM","pre":1.1906,"post":1.3596},{"id":"415","g":"twitter","t":"LD","pre":0.7477,"post":0.667},{"id":"415","g":"twitter","t":"PM","pre":1.1899,"post":1.078}];
+let rtTask='both',rtPts=true,rtFocus='';
+function qtl(a,p){const s=[...a].sort((x,y)=>x-y),h=(s.length-1)*p,b=Math.floor(h);return s[b]+((s[b+1]??s[b])-s[b])*(h-b)}
+function bstats(a){const q1=qtl(a,.25),md=qtl(a,.5),q3=qtl(a,.75),iq=q3-q1,lo=q1-1.5*iq,hi=q3+1.5*iq,inn=a.filter(v=>v>=lo&&v<=hi);
+  return{q1,md,q3,lo,hi,wl:Math.min(...inn),wh:Math.max(...inn),n:a.length,mean:a.reduce((x,y)=>x+y,0)/a.length}}
+const rtVals=(g,t,ph)=>DATA.rtPart.filter(p=>p.g===g&&p.t===t).map(p=>({id:p.id,v:p[ph]}));
+const TASKNAME={LD:'Lexical Decision (LD)',PM:'Prospective Memory (PM)'};
+function renderRTBox(play=true){
+  const W=1100,H=350,L=70,R=16,T=34,B=50,min=.5,max=2.1,sy=v=>T+(max-v)/(max-min)*(H-T-B),s=mk('rtBoxChart',W,H);
+  const tasks=rtTask==='both'?['LD','PM']:[rtTask],gap=34,fw=(W-L-R-gap*(tasks.length-1))/tasks.length;
+  for(let v=.6;v<=2.01;v+=.2){line(s,L,sy(v),W-R,sy(v),'#26334a');txt(s,L-10,sy(v)+4,v.toFixed(1)+'s',12,'#9aa7c2','end')}
+  axisTitleY(s,18,(T+H-B)/2,'Mean response time (s) · lower = faster');
+  tasks.forEach((t,ti)=>{const fx=L+ti*(fw+gap),bw=fw/4;
+    el(s,'rect',{x:fx,y:T-30,width:fw,height:22,rx:7,fill:t==='LD'?'#b5a0ff1f':'#70e5d31f'});
+    txt(s,fx+fw/2,T-15,TASKNAME[t],13,t==='LD'?'#cbbcff':'#8ff0e1','middle',800);
+    order.forEach((g,i)=>{const cx=fx+bw*i+bw/2,G=rowG(s,g+t);if(rtFocus&&rtFocus!==g)G.classList.add('dim');
+      const hit=el(G,'rect',{x:cx-bw/2+3,y:T-4,width:bw-6,height:H-T-B+44,rx:10,fill:rtFocus===g?'#b5a0ff10':'transparent',stroke:rtFocus===g?'#b5a0ff55':'none'});
+      hit.style.cursor='pointer';hit.addEventListener('click',()=>focusRT(g));
+      txt(G,cx,H-B+22,LBL[g],tasks.length===2?13:15,'#f4efff','middle',800,{'pointer-events':'none'});
+      el(G,'rect',{x:cx-12,y:H-B+30,width:24,height:3,rx:2,fill:COL[g],'pointer-events':'none'});
+      ['pre','post'].forEach((ph,j)=>{const v=rtVals(g,t,ph),st=bstats(v.map(p=>p.v)),c=ph==='pre'?'#8b98b6':COL[g];
+        const x=cx+(j?1:-1)*bw*.19,w=bw*.3,d=play?ti*300+i*110+j*60:0;
+        const Bx=anim(el(G,'g',{}),play?'g-boxin':'',d,`transform-origin:${x}px ${sy(st.md)}px`);
+        line(Bx,x,sy(st.wh),x,sy(st.q3),c,2);line(Bx,x,sy(st.q1),x,sy(st.wl),c,2);
+        line(Bx,x-w*.25,sy(st.wh),x+w*.25,sy(st.wh),c,2.2);line(Bx,x-w*.25,sy(st.wl),x+w*.25,sy(st.wl),c,2.2);
+        const bx=el(Bx,'rect',{x:x-w/2,y:sy(st.q3),width:w,height:Math.max(4,sy(st.q1)-sy(st.q3)),rx:5,fill:c,'fill-opacity':ph==='pre'?.18:.3,stroke:c,'stroke-width':2});
+        line(Bx,x-w/2,sy(st.md),x+w/2,sy(st.md),'#ffffff',3).setAttribute('pointer-events','none');
+        bx.style.cursor='pointer';bx.addEventListener('click',()=>focusRT(g));
+        hover(bx,`<strong>${LBL[g]} · ${t} · ${ph==='pre'?'Before':'After'}</strong><br>Median: <strong>${st.md.toFixed(2)} s</strong><br>Middle 50%: ${st.q1.toFixed(2)} – ${st.q3.toFixed(2)} s<br>Typical range: ${st.wl.toFixed(2)} – ${st.wh.toFixed(2)} s<br>${st.n} participants`);
+        v.forEach((p,k)=>{const out=p.v<st.lo||p.v>st.hi;if(!rtPts&&!out)return;
+          const jx=rtPts?x+(((k*37)%13)/12-.5)*w*.7:x;
+          const dot=anim(el(G,'circle',{cx:jx,cy:sy(Math.min(max,p.v)),r:out?5:3.6,fill:out?'#0e1324':c,'fill-opacity':out?1:.85,stroke:out?'#ffffff':'#0e1324','stroke-width':out?1.6:.8}),play?'g-pop':'',(play?ti*300+i*110:0)+450+k*14);
+          hover(dot,`Participant ${safe(p.id)} · ${LBL[g]} · ${t}<br>${ph==='pre'?'Before':'After'}: <strong>${p.v.toFixed(2)} s</strong>${out?'<br><span style="color:#ffcd94">Outlier</span>':''}`)});
+      });
+    });
+  });
+}
+function med(g,t,ph){return qtl(rtVals(g,t,ph).map(p=>p.v),.5)}
+function rtMsg(){
+  if(!rtFocus){const all=(t,ph)=>qtl(DATA.rtPart.filter(p=>p.t===t).map(p=>p[ph]),.5);
+    return `<b>Insight</b> PM answers take longer than LD (median ${all('PM','pre').toFixed(2)} s vs ${all('LD','pre').toFixed(2)} s). After the break, the <span style="color:#fff;font-weight:800">average</span> response time drops in every group, for both tasks, so people sped up. But TikTok sped up too while its PM accuracy fell from 78% to 47%: <span style="color:var(--rose);font-weight:800">faster isn't better</span>. Click a group to focus it.`}
+  const g=rtFocus,faster=DATA.rtPart.filter(p=>p.g===g&&p.t==='PM'&&p.post<p.pre).length;
+  const acc={rest:'84% → 91%',tiktok:'78% → 47%',twitter:'86% → 97%',youtube:'80% → 79%'}[g];
+  return `<b>${LBL[g]}</b> PM median ${med(g,'PM','pre').toFixed(2)} s → <span style="color:#fff;font-weight:800">${med(g,'PM','post').toFixed(2)} s</span> (${faster} of 15 got faster). LD median ${med(g,'LD','pre').toFixed(2)} s → ${med(g,'LD','post').toFixed(2)} s. Meanwhile PM accuracy went ${acc}.`;
+}
+function focusRT(g){rtFocus=rtFocus===g?'':g;renderRTBox(false);$('#rtInsight').innerHTML=rtMsg()}
+$$('#rtSeg .btn').forEach(b=>b.onclick=()=>{rtTask=b.dataset.m;$$('#rtSeg .btn').forEach(x=>x.classList.toggle('sel',x===b));renderRTBox(true)});
+$('#rtPts').onclick=()=>{rtPts=!rtPts;$('#rtPts').classList.toggle('sel',rtPts);$('#rtPts').textContent='Participants: '+(rtPts?'on':'off');renderRTBox(false)};
+$('#rtInsight').innerHTML=rtMsg();
+enter[8]=()=>renderRTBox(true);
+
+/* ---------- 10 speed ---------- */
+let spdTask='PM';const spdOff=new Set();
+function pearson(xs,ys){const n=xs.length,mx=xs.reduce((a,b)=>a+b)/n,my=ys.reduce((a,b)=>a+b)/n;let sxy=0,sx=0,sy=0;for(let i=0;i<n;i++){sxy+=(xs[i]-mx)*(ys[i]-my);sx+=(xs[i]-mx)**2;sy+=(ys[i]-my)**2}return{r:sxy/Math.sqrt(sx*sy),b:sxy/sx,a:my-sxy/sx*mx}}
+const grpOf=id=>DATA.individuals.find(p=>p.id===id).group;
+function renderScatter(play=true){
+  const W=1100,H=340,L=62,R=20,T=16,B=50,s=mk('speedChart',W,H),all=DATA.speedPoints.filter(p=>p.task===spdTask);
+  let mnx=Math.max(0,Math.floor((Math.min(...all.map(p=>p.rt))-.06)*10)/10),mxx=Math.ceil((Math.max(...all.map(p=>p.rt))+.06)*10)/10;
+  const sx=v=>L+(v-mnx)/(mxx-mnx)*(W-L-R),sy=v=>T+(100-v)/100*(H-T-B);
+  [0,25,50,75,100].forEach(v=>{line(s,L,sy(v),W-R,sy(v));txt(s,L-10,sy(v)+4,v+'%',12,'#aab7cf','end')});
+  for(let i=0;i<=4;i++){const v=mnx+(mxx-mnx)*i/4;line(s,sx(v),T,sx(v),H-B,'#29364d');txt(s,sx(v),H-B+20,v.toFixed(2)+'s',11,'#aab7cf','middle')}
+  txt(s,(L+W-R)/2,H-6,'Mean response time per participant (seconds)',12,'#8e9bb6','middle',600);
+  axisTitleY(s,16,(T+H-B)/2,'Accuracy (%)');
+  const f=pearson(all.map(p=>p.rt),all.map(p=>p.accuracy));
+  const ya=Math.max(0,Math.min(100,f.a+f.b*mnx)),yb=Math.max(0,Math.min(100,f.a+f.b*mxx)),len=Math.hypot(sx(mxx)-sx(mnx),sy(yb)-sy(ya));
+  anim(line(s,sx(mnx),sy(ya),sx(mxx),sy(yb),'#ffffffaa',2.5),play?'g-draw':'',all.length*18+100,`stroke-dasharray:${len};--len:${len}px;pointer-events:none`);
+  const guide=el(s,'g',{'pointer-events':'none'});
+  all.filter(p=>!spdOff.has(grpOf(p.id))).forEach((p,k)=>{const g=grpOf(p.id),cx=sx(p.rt),cy=sy(p.accuracy);
+    const c=anim(el(s,'circle',{cx,cy,r:6.5,fill:COL[g],'fill-opacity':.88,stroke:'#141830','stroke-width':1}),play?'g-pop':'',k*18);
+    hover(c,`Participant ${safe(p.id)} · ${LBL[g]}<br>${p.rt.toFixed(2)} s · <strong>${p.accuracy.toFixed(1)}%</strong>`);
+    c.addEventListener('mouseenter',()=>{guide.innerHTML='';line(guide,cx,cy,cx,H-B,COL[g],1.2,'4 4');line(guide,L,cy,cx,cy,COL[g],1.2,'4 4');
+      el(guide,'rect',{x:cx-30,y:H-B+5,width:60,height:20,rx:6,fill:COL[g]});txt(guide,cx,H-B+19,p.rt.toFixed(2)+'s',11,'#121225','middle',800);
+      el(guide,'rect',{x:L-50,y:cy-10,width:44,height:20,rx:6,fill:COL[g]});txt(guide,L-28,cy+4,p.accuracy.toFixed(0)+'%',11,'#121225','middle',800);c.setAttribute('r',9)});
+    c.addEventListener('mouseleave',()=>{guide.innerHTML='';c.setAttribute('r',6.5)})});
+  if(spdTask==='LD'&&!spdOff.has('youtube')){const o=all.find(p=>p.id==='310');anim(txt(s,sx(o.rt)+14,sy(o.accuracy)-4,'← participant 310: flagged and checked, not deleted',11,'#ffcd94','start',700),play?'g-fade':'',1200)}
+  s.append(guide);
+  $('#rLabel').innerHTML=`trend line · r = <b style="color:#fff">${f.r>=0?'+':''}${f.r.toFixed(2)}</b> (${Math.abs(f.r)<.3?'weak':'moderate'})`;
+  $('#spdLegend').innerHTML=order.map(g=>`<button class="lg-btn${spdOff.has(g)?' off':''}" data-g="${g}"><i style="background:${COL[g]}"></i>${LBL[g]}</button>`).join('')+'<span style="color:var(--muted)">click to show or hide a group</span>';
+  $$('#spdLegend .lg-btn').forEach(b=>b.onclick=()=>{const g=b.dataset.g;spdOff.has(g)?spdOff.delete(g):spdOff.add(g);if(spdOff.size===4)spdOff.delete(g);renderScatter(false)});
+}
+$$('#spdSeg .btn').forEach(b=>b.onclick=()=>{spdTask=b.dataset.t;$$('#spdSeg .btn').forEach(x=>x.classList.toggle('sel',x===b));renderScatter(true)});
+enter[9]=()=>renderScatter(true);
+
+/* ---------- 11 answers ---------- */
+$$('.flip').forEach(f=>f.onclick=()=>{f.classList.toggle('on');if($$('.flip').every(x=>x.classList.contains('on')))setTimeout(()=>confetti(innerWidth/2,innerHeight*.5,80),400)});
+$('#flipAll').onclick=()=>{const all=$$('.flip').every(x=>x.classList.contains('on'));$$('.flip').forEach((f,i)=>setTimeout(()=>f.classList.toggle('on',!all),i*120))};
+enter[10]=()=>updateQ();
+
+/* ---------- 13 thank you ---------- */
+enter[12]=()=>setTimeout(()=>confetti(innerWidth/2,innerHeight*.4,160),900);
+/* ---------- init ---------- */
+renderPM(false);renderChanges(false);renderRTBox(false);renderScatter(false);
+addEventListener('beforeprint',()=>{if(!pmRevealed){$('#guess').classList.add('gone');$('#pmPanel').classList.add('shown')}});
+const m=(location.hash||'').match(/slide-(\d+)/);go(m?+m[1]-1:0);
+</script>
+</body>
+</html>
